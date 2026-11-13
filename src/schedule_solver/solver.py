@@ -6,13 +6,15 @@ from zoneinfo import ZoneInfo
 
 from ortools.sat.python import cp_model
 
-from .calendars import candidates_for, legal_starts, slots
+from .calendars import candidates_for, eligible, legal_starts, slots
 from .greedy import greedy
 from .metrics import result_for
-from .models import Meeting, ObjectivePass, Workload
+from .models import Meeting, ObjectivePass, Period, Workload
 
 
-def solve(work: Workload, time_limit: float = 10.0):
+def solve(
+    work: Workload, time_limit: float = 10.0, *, previous: list[Meeting] | None = None
+):
     """Bound each optimization pass by a fifth of time_limit; return honest statuses.
 
     Model construction and explanations are not included in CP search's time limit.
@@ -20,6 +22,8 @@ def solve(work: Workload, time_limit: float = 10.0):
     """
     if not 0 < time_limit <= 120:
         raise ValueError("time_limit must be in (0, 120] seconds")
+    if previous is not None:
+        validate_previous(work, previous)
     begun = perf_counter()
     warm_start = greedy(work)
     warm_meetings = {m.request_id: m for m in warm_start.meetings}
@@ -40,7 +44,12 @@ def solve(work: Workload, time_limit: float = 10.0):
         # Canonical absent start removes a large symmetry without constraining present meetings.
         model.add(start == 0).only_enforce_if(y.Not())
         candidates = {}
-        for p in candidates_for(work, r):
+        pool = (
+            [p for p in work.people if eligible(p, r)]
+            if previous is not None
+            else candidates_for(work, r)
+        )
+        for p in pool:
             legal = legal_starts(work, r, p)
             if not legal:
                 continue
@@ -179,6 +188,44 @@ def solve(work: Workload, time_limit: float = 10.0):
         ("fairness", high - low, False),
         ("attendance", (len(active_days) + 1) * sum(optional) - sum(active_days), True),
     ]
+    if previous is not None:
+        changes = []
+        by_id = {r.id: r for r in work.requests}
+        for meeting in previous:
+            if meeting.request_id not in by_id:
+                continue
+            r = by_id[meeting.request_id]
+            minute = (meeting.start - work.start).total_seconds() / 60
+            same = model.new_bool_var(f"unchanged:{r.id}")
+            terms = [present[r.id]]
+            if (
+                minute % work.grid_minutes
+                or minute < 0
+                or minute > work.minutes - r.duration_minutes
+                or (meeting.end - meeting.start).total_seconds()
+                != r.duration_minutes * 60
+                or any((r.id, pid) not in attendance for pid in meeting.attendees)
+            ):
+                model.add(same == 0)
+            else:
+                at_start = model.new_bool_var(f"same_start:{r.id}")
+                model.add(
+                    starts[r.id] == int(minute) // work.grid_minutes
+                ).only_enforce_if(at_start)
+                model.add(
+                    starts[r.id] != int(minute) // work.grid_minutes
+                ).only_enforce_if(at_start.Not())
+                terms.append(at_start)
+                for p in work.people:
+                    if (r.id, p.id) in attendance:
+                        a = attendance[r.id, p.id]
+                        terms.append(a if p.id in meeting.attendees else a.Not())
+                model.add_bool_and(terms).only_enforce_if(same)
+                model.add_bool_or([term.Not() for term in terms]).only_enforce_if(
+                    same.Not()
+                )
+            changes.append(1 - same)
+        objectives.insert(1, ("stability", sum(changes), False))
     passes, best = [], None
     for name, objective, maximize in objectives:
         if maximize:
@@ -232,4 +279,42 @@ def solve(work: Workload, time_limit: float = 10.0):
     algorithm = "cp-sat" if best is not None else "cp-sat/greedy-warm-start"
     result = result_for(work, meetings, perf_counter() - begun, algorithm)
     result.passes = passes
+    if previous is not None:
+        current = {m.request_id: m for m in result.meetings}
+        ids = {r.id for r in work.requests}
+        result.changed_requests = sorted(
+            m.request_id
+            for m in previous
+            if m.request_id in ids
+            and (
+                m.request_id not in current
+                or m.start != current[m.request_id].start
+                or m.end != current[m.request_id].end
+                or set(m.attendees) != set(current[m.request_id].attendees)
+            )
+        )
     return result
+
+
+def validate_previous(work: Workload, previous: list[Meeting]):
+    if len(previous) > 1200 or len({m.request_id for m in previous}) != len(previous):
+        raise ValueError(
+            "previous meeting IDs must be unique, with at most 1200 meetings"
+        )
+    ids = {p.id for p in work.people}
+    for meeting in previous:
+        if (
+            not meeting.request_id
+            or not meeting.attendees
+            or len(set(meeting.attendees)) != len(meeting.attendees)
+            or set(meeting.attendees) - ids
+        ):
+            raise ValueError(
+                "previous meetings need unique known attendees and nonempty IDs"
+            )
+        Period(start=meeting.start, end=meeting.end)
+
+
+def resolve(work: Workload, previous: list[Meeting], time_limit: float = 10.0):
+    """Rebuild the edited workload, minimizing changes after scheduled priority."""
+    return solve(work, time_limit, previous=previous)

@@ -183,3 +183,4 @@ class Result(StrictModel):
     metrics: Metrics
     passes: list[ObjectivePass] = Field(default_factory=list)
     explanations: list[Explanation] = Field(default_factory=list)
+    changed_requests: list[str] = Field(default_factory=list)

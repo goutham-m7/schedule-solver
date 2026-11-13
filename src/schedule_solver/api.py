@@ -6,15 +6,19 @@ from pydantic import Field
 
 from .explain import explain_result
 from .greedy import greedy
-from .models import StrictModel, Workload
+from .models import Meeting, StrictModel, Workload
 from .render import calendar_html
-from .solver import solve
+from .solver import resolve, solve
 
 
 class SolveInput(StrictModel):
     workload: Workload
     time_limit: float = Field(default=10, gt=0, le=120)
     explanations: bool = True
+
+
+class ResolveInput(SolveInput):
+    previous: list[Meeting] = Field(max_length=1200)
 
 
 app = FastAPI(
@@ -50,3 +54,14 @@ def compare_endpoint(input: SolveInput):
 @app.post("/calendar", response_class=HTMLResponse)
 def calendar_endpoint(input: SolveInput):
     return calendar_html(input.workload, run(input))
+
+
+@app.post("/resolve")
+def resolve_endpoint(input: ResolveInput):
+    try:
+        result = resolve(input.workload, input.previous, input.time_limit)
+        return explain_result(input.workload, result) if input.explanations else result
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except RuntimeError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
