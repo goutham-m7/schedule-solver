@@ -81,7 +81,9 @@ def main():
                 person = next((p for p in work.people if p.id == args.person), None)
                 if person is None:
                     raise ValueError(f"unknown person: {args.person}")
-                person.busy.extend(import_ics(args.ics.read_text(), person.timezone))
+                person.busy.extend(
+                    import_ics(args.ics.read_text(), person.timezone, work)
+                )
                 # Revalidate after merging so limits are not bypassed.
                 work = Workload.model_validate(work.model_dump())
                 args.output.write_text(work.model_dump_json(indent=2) + "\n")

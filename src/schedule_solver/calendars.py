@@ -1,11 +1,12 @@
 """UTC grid and strict ICS busy-calendar import. All intervals are half-open."""
 
-from datetime import UTC, date, datetime, time, timedelta
+from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
 from icalendar import Calendar
 
 from .models import Period, Person, Request, Workload
+from .recurrence import event_periods
 
 
 def eligible(person, request):
@@ -110,9 +111,17 @@ def merge_periods(periods: list[Period]) -> list[Period]:
     return merged
 
 
-def import_ics(text: str, local_timezone: str) -> list[Period]:
-    """Read explicit VEVENT busy blocks; recurrence/floating events fail closed."""
+def import_ics(
+    text: str,
+    local_timezone: str,
+    horizon: Period | None = None,
+    *,
+    max_occurrences: int = 10000,
+) -> list[Period]:
+    """Read busy blocks, expanding recurrence only inside an explicit horizon."""
     zone = ZoneInfo(local_timezone)
+    if not 1 <= max_occurrences <= 10000:
+        raise ValueError("max_occurrences must be between 1 and 10000")
     try:
         calendar = Calendar.from_ical(text)
     except Exception as exc:
@@ -121,40 +130,14 @@ def import_ics(text: str, local_timezone: str) -> list[Period]:
         raise ValueError("ICS must contain VCALENDAR")
     periods = []
     for event in calendar.walk("VEVENT"):
-        if any(
-            key in event
-            for key in ("RRULE", "RDATE", "EXDATE", "RECURRENCE-ID", "EXRULE")
-        ):
-            raise ValueError(
-                "recurrence is not supported; expand recurring events before import"
-            )
+        if event.errors:
+            raise ValueError(f"invalid ICS recurrence or event property: {event.errors}")
+        if any(key in event for key in ("RECURRENCE-ID", "EXRULE")):
+            raise ValueError("unsupported recurrence override or EXRULE")
         if (
             str(event.get("STATUS", "")).upper() == "CANCELLED"
             or str(event.get("TRANSP", "")).upper() == "TRANSPARENT"
         ):
             continue
-        if "DTSTART" not in event:
-            raise ValueError("VEVENT requires DTSTART")
-        start = event.decoded("DTSTART")
-        if "DTEND" in event and "DURATION" in event:
-            raise ValueError("VEVENT cannot specify both DTEND and DURATION")
-        if "DTEND" in event:
-            end = event.decoded("DTEND")
-        elif "DURATION" in event:
-            end = start + event.decoded("DURATION")
-        elif type(start) is date:
-            end = start + timedelta(days=1)
-        else:
-            raise ValueError("timed VEVENT requires DTEND or DURATION")
-        if isinstance(start, datetime) != isinstance(end, datetime):
-            raise ValueError("DTSTART and DTEND must have the same value type")
-
-        def aware(value):
-            if isinstance(value, datetime):
-                if value.tzinfo is None:
-                    raise ValueError("floating ICS timestamps are not supported")
-                return value.astimezone(UTC)
-            return datetime.combine(value, time(), zone).astimezone(UTC)
-
-        periods.append(Period(start=aware(start), end=aware(end)))
+        periods.extend(event_periods(event, zone, horizon, max_occurrences))
     return merge_periods(periods)
