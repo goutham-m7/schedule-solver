@@ -16,6 +16,33 @@ def eligible(person, request):
     )
 
 
+def candidates_for(work: Workload, request: Request) -> list[Person]:
+    """Remove provably unnecessary specialists before building interval variables.
+
+    If requirement A's holders are a subset of B's, and A asks for at least
+    as many people, satisfying A implies B. A B-only person can be removed
+    without harming feasibility and strictly improves the staffing objective.
+    Hard fairness disables this reduction: extra staff can then be necessary.
+    """
+    if work.max_load_difference_minutes is not None:
+        return [p for p in work.people if eligible(p, request)]
+    requirements = [
+        (count, {p.id for p in work.people if name in getattr(p, attr)})
+        for attr in ("skills", "roles")
+        for name, count in sorted(getattr(request, attr).items())
+    ]
+    needed = set(request.required_attendees + request.optional_attendees)
+    for i, (count, holders) in enumerate(requirements):
+        redundant = any(
+            other <= holders and n >= count and (other != holders or n > count or j < i)
+            for j, (n, other) in enumerate(requirements)
+            if j != i
+        )
+        if not redundant:
+            needed.update(holders)
+    return [p for p in work.people if p.id in needed]
+
+
 def overlaps(a: datetime, b: datetime, c: datetime, d: datetime) -> bool:
     return a < d and c < b
 

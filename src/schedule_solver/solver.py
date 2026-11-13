@@ -6,7 +6,7 @@ from zoneinfo import ZoneInfo
 
 from ortools.sat.python import cp_model
 
-from .calendars import eligible, legal_starts, slots
+from .calendars import candidates_for, legal_starts, slots
 from .greedy import greedy
 from .metrics import result_for
 from .models import Meeting, ObjectivePass, Workload
@@ -40,9 +40,7 @@ def solve(work: Workload, time_limit: float = 10.0):
         # Canonical absent start removes a large symmetry without constraining present meetings.
         model.add(start == 0).only_enforce_if(y.Not())
         candidates = {}
-        for p in work.people:
-            if not eligible(p, r):
-                continue
+        for p in candidates_for(work, r):
             legal = legal_starts(work, r, p)
             if not legal:
                 continue
@@ -50,8 +48,8 @@ def solve(work: Workload, time_limit: float = 10.0):
             all_bools.append(a)
             candidates[p.id] = a
             model.add(a <= y)
-            model.add_allowed_assignments(
-                [start], [(s,) for s in legal]
+            model.add_linear_expression_in_domain(
+                start, cp_model.Domain.from_values(legal)
             ).only_enforce_if(a)
             interval = model.new_optional_fixed_size_interval_var(
                 start * work.grid_minutes - p.buffer_before_minutes,
@@ -61,35 +59,31 @@ def solve(work: Workload, time_limit: float = 10.0):
             )
             intervals[p.id].append(interval)
             zone = ZoneInfo(p.timezone)
-            days = sorted(
-                {
-                    work.instant(s * work.grid_minutes)
+            by_date = defaultdict(list)
+            for slot in legal:
+                day = (
+                    work.instant(slot * work.grid_minutes)
                     .astimezone(zone)
                     .date()
                     .isoformat()
-                    for s in legal
-                }
-            )
-            for day in days:
-                on_day = model.new_bool_var(f"day:{r.id}:{p.id}:{day}")
-                model.add(on_day <= a)
-                model.add_allowed_assignments(
-                    [start, on_day],
-                    [
-                        (
-                            s,
-                            int(
-                                work.instant(s * work.grid_minutes)
-                                .astimezone(zone)
-                                .date()
-                                .isoformat()
-                                == day
-                            ),
-                        )
-                        for s in legal
-                    ],
-                ).only_enforce_if(a)
+                )
+                by_date[day].append(slot)
+            membership = []
+            for day, day_slots in sorted(by_date.items()):
+                # A one-day horizon needs no table encoding or extra presence variable.
+                on_day = (
+                    a
+                    if len(by_date) == 1
+                    else model.new_bool_var(f"day:{r.id}:{p.id}:{day}")
+                )
+                if len(by_date) > 1:
+                    model.add_linear_expression_in_domain(
+                        start, cp_model.Domain.from_values(day_slots)
+                    ).only_enforce_if(on_day)
+                    membership.append(on_day)
                 daily[p.id, day].append((r, start, on_day))
+            if membership:
+                model.add(sum(membership) == a)
             if p.id in r.optional_attendees:
                 optional.append(a)
             elif p.id not in r.required_attendees:
