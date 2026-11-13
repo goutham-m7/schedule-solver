@@ -244,7 +244,7 @@ def solve(
             ObjectivePass(
                 name=name,
                 status=engine.status_name(status),
-                value=round(engine.objective_value) if success else None,
+                value=engine.value(objective) if success else None,
                 bound=engine.best_objective_bound if success else None,
             )
         )
@@ -253,7 +253,9 @@ def solve(
                 raise RuntimeError(f"invalid CP-SAT model: {model.validate()}")
             break
         best = engine
-        value = round(engine.objective_value)
+        # A time-limited response summary can lag its returned assignment.
+        # Lexicographic handoff must fix the actual integer expression value.
+        value = engine.value(objective)
         model.add(objective == value)
         model.clear_hints()
         for var in all_bools + list(starts.values()):
