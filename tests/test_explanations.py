@@ -1,7 +1,8 @@
+from test_solver import request
+
 from schedule_solver.explain import explain_result, insertion_feasible
 from schedule_solver.models import Workload
 from schedule_solver.solver import solve
-from test_solver import request
 
 
 def test_conflict_is_irreducible_against_fixed_schedule(payload):
@@ -12,13 +13,19 @@ def test_conflict_is_irreducible_against_fixed_schedule(payload):
     assert explanation.kind == "insertion_conflict"
     assert explanation.minimal
     assert "meeting:chosen" in explanation.conflict
-    assert not insertion_feasible(work, result, work.requests[1], set(explanation.conflict))
+    assert not insertion_feasible(
+        work, result, work.requests[1], set(explanation.conflict)
+    )
     for member in explanation.conflict:
-        assert insertion_feasible(work, result, work.requests[1], set(explanation.conflict)-{member})
+        assert insertion_feasible(
+            work, result, work.requests[1], set(explanation.conflict) - {member}
+        )
 
 
 def test_missing_skill_certificate(payload):
-    payload["requests"] = [request("unknown", required_attendees=[], skills={"quantum": 1})]
+    payload["requests"] = [
+        request("unknown", required_attendees=[], skills={"quantum": 1})
+    ]
     work = Workload.model_validate(payload)
     result = explain_result(work, solve(work))
     e = result.explanations[0]

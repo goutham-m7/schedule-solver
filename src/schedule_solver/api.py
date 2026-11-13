@@ -17,7 +17,11 @@ class SolveInput(StrictModel):
     explanations: bool = True
 
 
-app = FastAPI(title="schedule-solver", version="0.1.0", description="Local explainable CP-SAT scheduling. Fixed-schedule insertion certificates, not global unsat claims.")
+app = FastAPI(
+    title="schedule-solver",
+    version="0.1.0",
+    description="Local explainable CP-SAT scheduling. Fixed-schedule insertion certificates, not global unsat claims.",
+)
 
 
 def run(input: SolveInput):

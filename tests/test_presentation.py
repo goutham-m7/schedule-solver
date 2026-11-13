@@ -19,7 +19,13 @@ def test_html_escapes_ids_and_displays_local_time(payload):
 
 
 def test_mock_narrator_is_deterministic():
-    explanation = Explanation(request_id="r", kind="insertion_conflict", facts=["Frozen schedule"], conflict=["cap:a:2027-01-04"], minimal=True)
+    explanation = Explanation(
+        request_id="r",
+        kind="insertion_conflict",
+        facts=["Frozen schedule"],
+        conflict=["cap:a:2027-01-04"],
+        minimal=True,
+    )
     assert MockNarrator().describe(explanation) == MockNarrator().describe(explanation)
     assert "cap:a:" in MockNarrator().describe(explanation)
 
@@ -31,13 +37,27 @@ def test_openai_compatible_provider_uses_injected_boundary():
         certificate = json.loads(json.loads(request.content)["messages"][1]["content"])
         assert certificate["conflict"] == []
         assert certificate["request_id"] == "r"
-        return httpx.Response(200, json={"choices": [{"message": {"content": "Explanation."}}]})
+        return httpx.Response(
+            200, json={"choices": [{"message": {"content": "Explanation."}}]}
+        )
+
     with httpx.Client(transport=httpx.MockTransport(respond)) as client:
-        provider = OpenAINarrator("https://example.test/v1", "test-key", "model", client)
-        assert provider.describe(Explanation(request_id="r", kind="scheduled", facts=[])) == "Explanation."
+        provider = OpenAINarrator(
+            "https://example.test/v1", "test-key", "model", client
+        )
+        assert (
+            provider.describe(Explanation(request_id="r", kind="scheduled", facts=[]))
+            == "Explanation."
+        )
 
 
 def test_provider_errors_are_not_hidden():
-    with httpx.Client(transport=httpx.MockTransport(lambda _: httpx.Response(429))) as client:
-        with pytest.raises(httpx.HTTPStatusError):
-            OpenAINarrator("https://example.test", "key", "model", client).describe(Explanation(request_id="r", kind="scheduled", facts=[]))
+    with (
+        httpx.Client(
+            transport=httpx.MockTransport(lambda _: httpx.Response(429))
+        ) as client,
+        pytest.raises(httpx.HTTPStatusError),
+    ):
+        OpenAINarrator("https://example.test", "key", "model", client).describe(
+            Explanation(request_id="r", kind="scheduled", facts=[])
+        )

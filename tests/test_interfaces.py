@@ -26,30 +26,67 @@ def test_api_solve_compare_and_calendar(payload):
 
 def test_api_rejects_invalid_and_unbounded_work(payload):
     client = TestClient(app)
-    assert client.post("/solve", json={"workload": payload, "time_limit": 999}).status_code == 422
+    assert (
+        client.post("/solve", json={"workload": payload, "time_limit": 999}).status_code
+        == 422
+    )
     payload["requests"][0]["required_attendees"] = ["unknown"]
     assert client.post("/solve", json={"workload": payload}).status_code == 422
 
 
 def test_cli_solve_and_invalid_file(payload, tmp_path):
-    path = tmp_path/"work.json"
+    path = tmp_path / "work.json"
     path.write_text(json.dumps(payload))
-    process = subprocess.run([sys.executable, "-m", "schedule_solver", "solve", str(path), "--time-limit", "2"], capture_output=True, text=True)
+    process = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "schedule_solver",
+            "solve",
+            str(path),
+            "--time-limit",
+            "2",
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
     assert process.returncode == 0, process.stderr
     assert json.loads(process.stdout)["metrics"]["meetings_scheduled"] == 1
     path.write_text("{}")
-    process = subprocess.run([sys.executable, "-m", "schedule_solver", "solve", str(path)], capture_output=True, text=True)
+    process = subprocess.run(
+        [sys.executable, "-m", "schedule_solver", "solve", str(path)],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
     assert process.returncode == 2
     assert "error:" in process.stderr and "Traceback" not in process.stderr
 
 
 def test_demo_offline_writes_real_outputs(tmp_path):
-    process = subprocess.run([sys.executable, "-m", "schedule_solver", "demo", "--people", "5", "--output", str(tmp_path), "--time-limit", "2"], capture_output=True, text=True)
+    process = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "schedule_solver",
+            "demo",
+            "--people",
+            "5",
+            "--output",
+            str(tmp_path),
+            "--time-limit",
+            "2",
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
     assert process.returncode == 0, process.stderr
     assert "greedy-first-fit" in process.stdout and "cp-sat" in process.stdout
     assert "Conflict:" in process.stdout
-    assert (tmp_path/"calendar.html").exists()
-    assert json.loads((tmp_path/"result.json").read_text())["meetings"]
+    assert (tmp_path / "calendar.html").exists()
+    assert json.loads((tmp_path / "result.json").read_text())["meetings"]
 
 
 def test_synthetic_reproducibility():

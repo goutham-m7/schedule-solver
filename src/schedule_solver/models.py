@@ -1,9 +1,16 @@
 """Strict, timezone-aware public input and result contracts."""
 
-from datetime import datetime, time, timezone
+from datetime import UTC, datetime, time
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import (
+    AwareDatetime,
+    BaseModel,
+    ConfigDict,
+    Field,
+    field_validator,
+    model_validator,
+)
 
 
 class StrictModel(BaseModel):
@@ -31,7 +38,9 @@ class WorkingHours(StrictModel):
     @model_validator(mode="after")
     def ordered(self):
         if self.start >= self.end or any(d not in range(7) for d in self.weekdays):
-            raise ValueError("working hours need same-day start < end and weekdays 0..6")
+            raise ValueError(
+                "working hours need same-day start < end and weekdays 0..6"
+            )
         if any(t.tzinfo or t.second or t.microsecond for t in (self.start, self.end)):
             raise ValueError("working hours must be naive local minute-precision times")
         return self
@@ -74,13 +83,19 @@ class Request(StrictModel):
     def valid(self):
         Period(start=self.earliest, end=self.latest)
         if not (self.required_attendees or self.skills or self.roles):
-            raise ValueError("a request needs required attendees or skill/role requirements")
+            raise ValueError(
+                "a request needs required attendees or skill/role requirements"
+            )
         for group in (self.required_attendees, self.optional_attendees):
             if len(group) != len(set(group)):
                 raise ValueError("attendee lists must be unique")
         if set(self.required_attendees) & set(self.optional_attendees):
             raise ValueError("required and optional attendees must be disjoint")
-        if any(not k or type(n) is not int or n < 1 or n > 100 for d in (self.skills, self.roles) for k, n in d.items()):
+        if any(
+            not k or type(n) is not int or n < 1 or n > 100
+            for d in (self.skills, self.roles)
+            for k, n in d.items()
+        ):
             raise ValueError("skill/role cardinalities must be integers 1..100")
         return self
 
@@ -94,9 +109,14 @@ class Workload(Period):
     @model_validator(mode="after")
     def references(self):
         ids = [p.id for p in self.people]
-        if len(ids) != len(set(ids)) or len({r.id for r in self.requests}) != len(self.requests):
+        if len(ids) != len(set(ids)) or len({r.id for r in self.requests}) != len(
+            self.requests
+        ):
             raise ValueError("person and request IDs must be unique")
-        if any(set(r.required_attendees + r.optional_attendees) - set(ids) for r in self.requests):
+        if any(
+            set(r.required_attendees + r.optional_attendees) - set(ids)
+            for r in self.requests
+        ):
             raise ValueError("request references an unknown person")
         if (self.end - self.start).total_seconds() > 7 * 86400:
             raise ValueError("horizon must not exceed seven days")
@@ -104,11 +124,15 @@ class Workload(Period):
 
     @property
     def minutes(self):
-        return int((self.end.astimezone(timezone.utc) - self.start.astimezone(timezone.utc)).total_seconds() // 60)
+        return int(
+            (self.end.astimezone(UTC) - self.start.astimezone(UTC)).total_seconds()
+            // 60
+        )
 
     def instant(self, minute: int) -> datetime:
         from datetime import timedelta
-        return self.start.astimezone(timezone.utc) + timedelta(minutes=minute)
+
+        return self.start.astimezone(UTC) + timedelta(minutes=minute)
 
 
 class Meeting(StrictModel):
