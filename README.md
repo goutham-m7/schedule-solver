@@ -219,8 +219,12 @@ Observed: **75 tests passed; 95.62% statement coverage.** Tests include a small
 exhaustive priority oracle, an independent schedule-validity checker, DST folds,
 local-day caps, buffers, fairness, minimal certificates, real CLI subprocesses,
 FastAPI HTTP contracts, ICS parsing and the optional provider HTTP boundary.
-One upstream Starlette TestClient/httpx deprecation warning remains; no test fails.
+Upstream Starlette/httpx and, in the clean clone, bool-inversion import deprecation
+warnings remain visible; no test fails.
 CI runs lint, format, coverage and an offline demo. No live LLM key is used in tests.
+
+A [clean local clone](evidence/clean-clone.md) also passed frozen installation,
+lint, format, all tests and the offline demo, importing its own package.
 
 ## Optional narrator
 

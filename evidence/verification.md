@@ -25,6 +25,6 @@ uv run schedule-solver solve artifacts/merged.json --time-limit 2
   scroll at a mobile-width viewport. Observed capture in calendar.webp.
 - Documented ICS import plus solve: 10 scheduled.
 - No hosted LLM credential or paid live provider was exercised.
-- No remote, push or package publish was performed.
+- Source repository has no remotes; no push, network remote or package publish.
 
 Environment: macOS arm64; CPython 3.12.15; OR-Tools 9.15.6755; uv 0.13.5.
