@@ -1,5 +1,7 @@
 """Local, stateless FastAPI surface. Do not expose without auth and admission control."""
 
+from importlib.metadata import version
+
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import HTMLResponse, Response
 from pydantic import Field
@@ -7,7 +9,7 @@ from pydantic import Field
 from .calendars import export_ics
 from .explain import explain_result
 from .greedy import greedy
-from .models import Meeting, StrictModel, Workload
+from .models import Meeting, Result, StrictModel, Workload
 from .render import calendar_html
 from .solver import resolve, solve
 
@@ -24,7 +26,7 @@ class ResolveInput(SolveInput):
 
 app = FastAPI(
     title="schedule-solver",
-    version="0.1.0",
+    version=version("schedule-solver"),
     description="Local explainable CP-SAT scheduling. Fixed-schedule insertion certificates, not global unsat claims.",
 )
 
@@ -42,12 +44,12 @@ def health():
     return {"status": "ok"}
 
 
-@app.post("/solve")
+@app.post("/solve", response_model=Result)
 def solve_endpoint(input: SolveInput):
     return run(input)
 
 
-@app.post("/compare")
+@app.post("/compare", response_model=dict[str, Result])
 def compare_endpoint(input: SolveInput):
     return {"optimized": run(input), "greedy": greedy(input.workload)}
 
@@ -57,7 +59,7 @@ def calendar_endpoint(input: SolveInput):
     return calendar_html(input.workload, run(input))
 
 
-@app.post("/resolve")
+@app.post("/resolve", response_model=Result)
 def resolve_endpoint(input: ResolveInput):
     try:
         result = resolve(input.workload, input.previous, input.time_limit)

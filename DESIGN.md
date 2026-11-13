@@ -6,7 +6,7 @@ assignments and exclusions without an LLM deciding feasibility. All bundled data
 is synthetic. The implementation is original Python 3.12 with OR-Tools CP-SAT,
 Pydantic, FastAPI, icalendar, httpx and the standard library.
 
-Scope: at most 100 people, 500 requests and a seven-day horizon. No database,
+Scope: at most 500 people, 1200 requests and a seven-day horizon. No database,
 remote calendar writes, account credentials, production service or employer data.
 These are input bounds, not a guarantee that every dense instance solves quickly.
 
@@ -142,9 +142,11 @@ caps and optional hard fairness. The universe intrinsically requires an attendee
 A sufficient unsat core is only a starting point. Disable all non-core named
 constraints, then try deleting each core member. Keep a member only when deleting
 it makes insertion feasible. Monotonicity means one deletion pass establishes
-inclusion minimality. Each returned label is necessary relative to the other
-returned labels. The result is **not minimum cardinality**, and different valid
-cores may exist. Cap labels include the frozen calendar's count as a fixed fact.
+inclusion minimality. For at most 12 labels, enumerate the full constraint universe
+in increasing subset size up to the known core size, with a five-second search
+deadline. The first unsatisfiable subset proves minimum cardinality. Larger
+universes retain inclusion minimality. `Explanation.guarantee` distinguishes the
+two contracts. Cap labels include the frozen calendar's count as a fixed fact.
 
 If full insertion is feasible, return `insertable`: omission came from objectives
 or a time-limited incumbent, not an impossibility. Each feasibility check has a
@@ -156,12 +158,19 @@ This does not prove that moving other meetings cannot admit the target. A global
 movable minimal repair set is a different, deliberately unimplemented contract.
 
 ## ICS and boundary behavior
-Use the real icalendar parser, not a hand-written line parser. Explicit timed
-VEVENTs accept DTEND or DURATION, not both. All-day dates localize midnight in the
-person's zone. TZID timestamps convert to UTC. Cancelled/transparent events do not
-block. Reject floating timestamps, recurrence rules/dates/exclusions/overrides,
-missing timed-event ends, mixed date/datetime endpoints and malformed intervals.
-No expansion is silently skipped and no remote ICS URL is fetched.
+Use icalendar for parsing and serialization. Timed VEVENTs accept DTEND or DURATION,
+not both. All-day dates localize midnight in the person's zone. RRULE, RDATE and
+EXDATE expand only inside an explicit horizon; historical traversal and generated
+instances are bounded. Preserve local recurrence times across DST, skip nonexistent
+instances without counting them, and choose the first fold for ambiguous times.
+DTEND gives exact elapsed duration; DURATION adds nominal local days followed by
+elapsed hours/minutes. Floating timestamps, detached overrides, EXRULE and malformed
+events fail closed. Cancelled/transparent events do not block. No remote URL is fetched.
+
+Export validates identity, timing, staffing, calendars, buffered exclusivity, daily
+caps and hard fairness independently of CP-SAT. UTC VEVENTs have deterministic
+request-derived UIDs and JSON attendee IDs in X-SCHEDULE-ATTENDEES, not fake email
+addresses. Reusing a request ID across unrelated workloads reuses its UID.
 
 The optional narrator receives computed explanation JSON only and cannot change
 result objects or certificates. The default mock emits deterministic text. The
@@ -212,10 +221,10 @@ The recorded largest instance demonstrates that trade-off rather than hiding it.
 
 ### 2. Minimal explanation versus misleading impossibility
 A CP-SAT sufficient core is not minimal, and a fixed-placement conflict is not a
-global unschedulability proof. Minimum-cardinality conflict search and globally
-movable repair sets are more expensive, different questions. The chosen contract
-freezes existing assignments, groups understandable constraints, and re-solves
-every deletion. It is checkable and useful for insertion, with explicit limitations.
+global unschedulability proof. Small universes now receive an exhaustive
+minimum-cardinality proof; larger universes receive deletion checks. Globally
+movable repair sets remain a separate question. All proofs freeze existing
+assignments and retain explicit guarantee metadata.
 An LLM summary cannot provide this proof.
 
 ### 3. Model representation versus combinatorial blow-up
@@ -240,6 +249,20 @@ Keep exact small-case oracles and certificate checks as regression guards. Measu
 memory and tail latency before claiming a 10,000-person service.
 
 ## Roadmap, not implemented
-Capacity-normalized fairness; expanded recurrence with explicit bounds; movable
-repair certificates; density/seed benchmark distributions; isolated asynchronous
-HTTP jobs. There are no placeholder implementations for these features.
+Capacity-normalized fairness; rooms/resources; weighted time preferences; detached
+recurrence overrides; movable repair certificates; broader density/seed benchmark
+distributions; isolated asynchronous HTTP jobs. See [ROADMAP.md](ROADMAP.md).
+
+## v0.2 additions and measurement finding
+
+[Release design](docs/v0.2-design.md) records alternatives, failure behavior and
+verification contracts. Stateless `resolve()` rebuilds an edited workload and
+minimizes changed retained assignments after priority but before ordinary
+tie-breakers. Missing requests are cancellations; no mutable session is stored.
+Changing the start, duration, attendance or scheduled presence counts once.
+
+Larger tests exposed an OR-Tools 9.15 response inconsistency: a time-limited
+fairness pass reported objective_value=120 while evaluating its returned
+high_load-low_load expression gave 90. Both pass metadata and lexicographic
+handoff now use the actual integer expression value. The 200-person regression
+executes the real solver, not a mocked response.

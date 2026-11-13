@@ -1,271 +1,272 @@
 # schedule-solver
 
-CP-SAT meeting scheduling with hard calendar constraints and checked conflict explanations.
+Offline CP-SAT meeting scheduling with calendar constraints and checked conflict explanations.
 
-- First-fit wastes capacity when flexible requests consume scarce windows. Optimize the whole workload instead.
-- Enforce availability, local working hours, buffers, skills, roles, daily caps and optional hard load fairness.
-- Explain tight constraints and return a deletion-minimal conflict certificate for every excluded request.
+**v0.2.0:** recurring busy calendars, stable re-solving, small minimum-cardinality
+conflicts, checked ICS export, and benchmark curves through 500 people.
 
-**100 people: 200 meetings versus greedy's 160 (+25%), in 1.056 seconds.**
-The primary priority objective was proven optimal. Secondary objectives were not all
-proven optimal; that run had more gap minutes than greedy. Full results below.
+On a **synthetic 200-person workload**, the solver scheduled **400 meetings versus
+first-fit's 320**, with the priority objective proven optimal, in **7.000 seconds**.
+At 500 people the same budget produced only 804 versus 800: this is not a claim that
+large instances are solved optimally. Full curves and limitations are below.
+
+## Quickstart
+
+Requires [uv](https://docs.astral.sh/uv/) and Python 3.12 or newer.
 
 ```sh
+uv sync --frozen
 uv run schedule-solver demo --people 5 --seed 7 --time-limit 10 --output artifacts/demo
+# Open artifacts/demo/calendar.html or import artifacts/demo/schedule.ics.
 ```
 
-Captured output (timing varies):
+Measured local output; timing varies:
 
 ```text
 | People | Requests | Algorithm | Scheduled | Priority | Gap-min | Spread-min | Solve-s | Priority status |
 |---:|---:|:---|---:|---:|---:|---:|---:|:---|
 | 5 | 12 | greedy-first-fit | 8 | 18 | 120 | 60 | 0.001 | n/a |
-| 5 | 12 | cp-sat | 10 | 20 | 30 | 60 | 0.056 | OPTIMAL |
+| 5 | 12 | cp-sat | 10 | 20 | 30 | 60 | 0.063 | OPTIMAL |
 ```
 
-No key or network access is needed after installing dependencies. The scheduling,
-certificates, metrics, CLI, HTTP API and HTML calendar are non-AI code. An optional
-OpenAI-compatible narrator can rephrase computed certificates; it cannot change them.
+The demo writes `workload.json`, `result.json`, `calendar.html` and `schedule.ics`.
+Scheduling, explanations and export need no keys or network after installation.
+The optional narrator is separate from the mathematical decisions.
 
-## Quickstart
+[Changelog](CHANGELOG.md) · [Completed milestone and delivery commits](ROADMAP.md) ·
+[Design](DESIGN.md) · [v0.2 technical decisions](docs/v0.2-design.md)
 
-Requires [uv](https://docs.astral.sh/uv/) and Python 3.12. From the repository root:
+## Workload and constraints
+
+See [examples/workload.json](examples/workload.json). IDs are strings; timestamps
+need explicit offsets and minute precision. Availability means **free time**;
+`busy` and imported ICS events subtract from it. IANA time zones define local
+working hours and daily caps. Weekdays run Monday=0 through Sunday=6.
+
+Requests specify `duration_minutes`, `priority`, `earliest`, `latest`, required and
+optional attendees, and minimum skill/role counts. One person can cover multiple
+requirements. `latest` bounds the meeting's **end**. Combined per-person buffers
+are hard constraints. Optional `max_load_difference_minutes` is a hard horizon-wide
+meeting-minute spread limit, not capacity-normalized utilization.
+
+Limits: 500 people, 1200 requests, seven days. These are input limits, not latency
+or optimality guarantees. Meetings and padded working hours stay within one
+attendee-local day; overnight working-hour definitions are rejected.
 
 ```sh
-uv sync --frozen
-uv run schedule-solver demo --people 5 --seed 7 --time-limit 10 --output artifacts/demo
-# Open artifacts/demo/calendar.html in a browser.
-```
-
-The command writes `workload.json`, `result.json` (all explanations), and a static
-`calendar.html`. Console explanations show the first pod to keep larger demos readable.
-`uv run schedule-solver demo` also works as a one-command default demo.
-
-[Actual mobile-width calendar capture](evidence/calendar.webp).
-
-Python fits this project because OR-Tools exposes its native CP-SAT API directly,
-`zoneinfo` handles local calendars, and Pydantic shares validation between the CLI
-and FastAPI. There is no database or frontend build step.
-
-## Architecture
-
-```mermaid
-flowchart LR
-    ICS[ICS busy events] --> Import[Strict calendar importer]
-    JSON[Validated JSON workload] --> Grid[UTC grid and local calendar rules]
-    Import --> JSON
-    Grid --> CP[OR-Tools CP-SAT]
-    Grid --> Greedy[Independent greedy first-fit]
-    CP --> Result[Assignments and objective bounds]
-    Result --> Explain[Assumption core and deletion checks]
-    Result --> Compare[Shared metrics]
-    Greedy --> Compare
-    Explain --> CLI[CLI / FastAPI / static HTML]
-    Compare --> CLI
-    Explain -. optional .-> Narrator[Mock or OpenAI-compatible commentary]
-```
-
-## Input and interfaces
-
-See [`examples/workload.json`](examples/workload.json) for a complete synthetic
-input. IDs are strings. Timestamps need explicit offsets and minute precision.
-Availability is **free time**; `busy` and imported ICS events subtract from it.
-Working hours use IANA time zones and weekdays Monday=0 through Sunday=6.
-
-A request specifies `duration_minutes`, `priority`, `earliest`, `latest`, and any
-combination of `required_attendees`, `optional_attendees`, `skills`, and `roles`.
-Skill/role dictionaries map names to minimum attendee counts. A person can satisfy
-multiple requirements. Optional attendees are best-effort; they cannot reduce a
-higher-ranked objective. The latest timestamp bounds the meeting's **end**.
-
-```sh
-uv run schedule-solver solve examples/workload.json --html artifacts/custom.html
+uv run schedule-solver solve examples/workload.json --html artifacts/custom.html --ics artifacts/custom.ics
 uv run schedule-solver import-ics examples/workload.json p000 examples/busy.ics --output artifacts/merged.json
 uv run schedule-solver solve artifacts/merged.json
+```
+
+CLI errors exit with status 2 and a short message. IDs and calendar output are
+escaped by the rendering/serialization libraries, not interpolated as markup.
+
+## Recurring busy calendars
+
+`import-ics` supplies the workload horizon automatically. Python callers supply a
+`Period` when importing RRULE, RDATE or EXDATE:
+
+```python
+from schedule_solver.calendars import import_ics
+from schedule_solver.models import Period
+
+horizon = Period(start="2027-03-07T00:00:00Z", end="2027-03-23T00:00:00Z")
+text = """BEGIN:VCALENDAR
+VERSION:2.0
+BEGIN:VEVENT
+UID:weekly-review
+DTSTART;TZID=America/New_York:20270307T090000
+DTEND;TZID=America/New_York:20270307T100000
+RRULE:FREQ=WEEKLY;COUNT=3
+EXDATE;TZID=America/New_York:20270321T090000
+END:VEVENT
+END:VCALENDAR
+"""
+periods = import_ics(text, "America/New_York", horizon)
+```
+
+Local recurrence times survive DST: the test above yields starts at 14:00 UTC
+before the spring transition and 13:00 UTC afterward. EXDATE removes instances;
+RDATE adds instances. All-day dates use local midnights. Nonexistent local instances
+are skipped without consuming COUNT; ambiguous times use the first fold. DTEND
+preserves elapsed duration; DURATION adds local days before elapsed hours/minutes.
+Returned intervals are clipped to the supplied horizon and merged.
+
+Floating times, detached `RECURRENCE-ID` overrides, EXRULE and malformed properties
+fail closed. Cancelled/transparent events do not block. Expansion has a per-event
+10,000-instance traversal limit, including historical instances; long historical
+or high-frequency series can hit it even for a short requested horizon. No remote
+calendar fetch or provider synchronization is implemented.
+
+## Re-solve after an edit
+
+```python
+from schedule_solver.solver import resolve, solve
+from schedule_solver.synthetic import generate
+
+work = generate(5, seed=7)
+before = solve(work)
+edited = work.model_copy(deep=True)
+edited.requests = [r for r in edited.requests if r.id != "pod0-flex"]
+after = resolve(edited, before.meetings)
+print(after.changed_requests)
+```
+
+Pass the **complete edited workload** plus previous assignments. Add a request to
+add a meeting, edit its window/duration/team requirements to move it, or remove its
+ID to cancel it. Missing IDs are explicit cancellations and do not count as
+unintended changes. Structural errors in previous assignments are rejected, but
+old assignments may violate newly edited calendars.
+
+Priority remains first. The next pass minimizes the number of retained requests
+whose start, end, attendee set or scheduled presence changes. Ordinary packing,
+staffing and fairness tie-breakers follow. This counts changed meetings, not moved
+minutes. `changed_requests` reports the affected retained IDs. Cancelled IDs cannot
+be distinguished from typos without the old workload: preserve IDs carefully.
+
+This is a stateless model rebuild, not an in-memory incremental CP-SAT session.
+A `FEASIBLE` stability pass gives an incumbent, not a minimal-change proof;
+`OPTIMAL` proves stability only conditional on the earlier fixed priority value.
+Very small budgets can return the greedy fallback without reaching stability.
+
+## Explanations and export
+
+Scheduled explanations report factual tight windows, working-hour/free-time edges,
+neighbor buffers, caps and staffing. They are not unique-cause proofs.
+
+Excluded requests get **fixed-schedule insertion** certificates:
+
+- At most 12 constraint labels: enumerate the entire label universe in increasing
+  subset size and prove `guarantee="minimum-cardinality"`.
+- Larger universes: reduce an assumption core by deletion, returning
+  `guarantee="inclusion-minimal"`. Removing any member admits insertion relative
+  to the remaining named constraints, with other labels relaxed.
+- Feasible insertion: return `insertable`, not a fabricated conflict.
+- Diagnostic timeout: fail instead of claiming an unchecked proof.
+
+Existing assignments remain frozen in every certificate. Neither guarantee proves
+that rearranging other meetings cannot fit the target. Small exhaustive searches
+have a five-second deadline in addition to bounded individual feasibility checks.
+
+`export_ics(workload, result)` independently checks IDs, duration/grid, staffing,
+free/busy calendars, buffered overlap, daily caps and hard fairness. Exported UTC
+VEVENTs use deterministic request-derived UIDs and escaped request IDs as summaries.
+Attendee IDs are JSON in `X-SCHEDULE-ATTENDEES`, not fabricated email addresses.
+Use globally unique request IDs when combining unrelated workloads in one calendar:
+reusing an ID reuses its UID. No invites are sent. Round-trip parsing is tested;
+Google/Outlook UI import has not been tested.
+
+## Local HTTP API
+
+```sh
 uv run schedule-solver serve --port 8000
+# Interactive docs: http://127.0.0.1:8000/docs
+# OpenAPI schema:   http://127.0.0.1:8000/openapi.json
 ```
 
-In another terminal:
-
-```sh
-curl -sS http://127.0.0.1:8000/health
-uv run python -c 'import json; from schedule_solver.synthetic import generate; print(json.dumps({"workload": generate(5).model_dump(mode="json"), "time_limit": 2}))' | curl -sS --json @- http://127.0.0.1:8000/solve
-```
-
-| Endpoint | Contract |
+| Endpoint | Request / result |
 |---|---|
-| `GET /health` | Liveness only; no network provider dependency |
-| `POST /solve` | `{"workload": ..., "time_limit": 10, "explanations": true}` → result JSON |
-| `POST /compare` | Same input → `optimized` and `greedy` results |
-| `POST /calendar` | Same input → escaped, script-free HTML calendar |
+| `GET /health` | Liveness, no provider dependency |
+| `POST /solve` | Solve input → typed Result |
+| `POST /compare` | Solve input → optimized and greedy Results |
+| `POST /calendar` | Solve input → script-free HTML |
+| `POST /export-ics` | Solve input → `text/calendar` |
+| `POST /resolve` | Solve input plus `previous: Meeting[]` → typed Result |
 
-Invalid input returns HTTP 422. Diagnostic timeout returns 503, never a fabricated
-conflict. CLI errors exit with status 2 and a short message. The service binds
-loopback; it has no authentication, persistence, or production admission control.
+Solve input is `{"workload": ..., "time_limit": 10, "explanations": true}`.
+Set `explanations` false when certificates are unnecessary. Invalid input returns
+422; unfinished diagnosis returns 503. OpenAPI includes request and Result schemas.
+The service binds loopback and has **no authentication, persistence or production
+admission control**. Do not expose it publicly as-is.
 
-## How optimization works
+## Optimization and benchmarks
 
-One start integer and one scheduled Boolean per request. Each eligible attendee
-gets an optional buffered interval sharing that start. Allowed integer domains
-encode calendar feasibility. `NoOverlap` enforces resource exclusivity; local-date
-presence variables enforce daily caps.
+The solver uses shared integer starts, optional buffered attendee intervals,
+`NoOverlap`, local-date caps and domain-filtered calendar feasibility. Ordinary
+lexicographic passes maximize priority, minimize unnecessary staffing, minimize
+person-day gaps, minimize load spread, then maximize optional attendance and reduce
+active person-days. Re-solving inserts stability immediately after priority.
+Each pass fixes its actual returned integer expression value; a regression covers
+a time-limited OR-Tools objective summary that differed from its assignment.
 
-Lexicographic passes:
-
-1. Maximize scheduled priority.
-2. Minimize non-required, non-optional staffing; do not add spectators to fake fairness.
-3. Minimize internal person-day gap minutes.
-4. Minimize workload-wide max-minus-min attendee meeting-minute load.
-5. Maximize optional attendance, then minimize active person-days.
-
-Each pass fixes its incumbent value. Search records `OPTIMAL`, `FEASIBLE` or
-`UNKNOWN` and the objective bound. A subsequent optimal pass only proves optimality
-**conditional on earlier fixed incumbent values**. A greedy warm start provides a
-valid result even if CP-SAT never finds an incumbent. Such results are labelled
-`cp-sat/greedy-warm-start`, not a proven CP optimum.
-
-`--time-limit T` gives each pass a wall ceiling of `T/5` seconds and a deterministic
-CP-SAT work budget of `T/100`. Construction and certificate extraction are outside
-that ceiling. One worker, solver seed zero, and seeded workloads make search
-repeatable on the pinned versions unless the wall safety ceiling fires. Wall times
-are measurements, not expected output assertions.
-
-## Explanations, precisely
-
-Scheduled meetings report tight window boundaries, free-time/working-hour edges,
-full daily caps, touching neighbor buffers, staffing requirements, and the chosen
-team's static legal-start count. These are factual local constraints, **not proof
-that this was the unique best slot**.
-
-Unscheduled requests get an assumption-core certificate reduced by deletion checks.
-For the returned subset, insertion is impossible; removing any one member admits
-insertion with the remaining named constraints. Other members of the original
-constraint universe are relaxed during those checks.
-
-**The existing assignments stay fixed.** This is inclusion-minimal, not the
-smallest-cardinality subset, and not proof that rearranging the calendar cannot
-fit the request. If insertion is possible, the result explicitly says `insertable`
-instead of calling it infeasible. Constraint groups include window, eligibility,
-required attendees, skills/roles, free/busy time, working hours, frozen meetings,
-daily caps and optional hard fairness.
-
-Actual first exclusion from the demo:
-
-```text
-pod0-long0 [insertion_conflict]: Deletion-minimal conflict with the returned schedule held fixed; not minimum-cardinality and not a claim about rearranging meetings. Required attendees=['p000']; skills={}; roles={}. Eligibility restricts attendees to named people or holders of a requested skill/role. Frozen meeting pod0-second0: 2027-01-04T10:00:00+00:00 to 2027-01-04T11:00:00+00:00, attendees=['p000'], with each attendee's buffers. Conflict: eligibility:pod0-long0, meeting:pod0-second0.
-```
-
-The test suite independently removes every member from an example certificate and
-checks that insertion becomes feasible. Full recorded output:
-[`evidence/demo.txt`](evidence/demo.txt). Live HTTP smoke response:
-[`evidence/api-smoke.json`](evidence/api-smoke.json).
-
-## Benchmarks
-
-Exact command used for the table:
+`--time-limit T` bounds each of N passes by T/N wall seconds and T/(20N)
+deterministic solver-work units. Construction, greedy warm start, explanations,
+serialization and process startup are **outside the search ceiling**. Reported
+solve time includes construction and the warm start, but not explanations or I/O.
+One worker, fixed solver seed and seeded synthetic workloads make comparisons
+repeatable unless the wall ceiling fires. More budget does not promise monotonic
+quality on arbitrary workloads; secondary optima are conditional on earlier values.
 
 ```sh
-uv run schedule-solver benchmark --seed 7 --time-limit 10 --output artifacts/benchmark
+uv run schedule-solver benchmark --sizes 200 500 --families independent ring --budgets 0.1 10 60 --seed 7 --output artifacts/v02-final-curves
 ```
 
-| People | Requests | Algorithm | Scheduled | Priority | Gap-min | Spread-min | Solve-s | Priority status |
-|---:|---:|:---|---:|---:|---:|---:|---:|:---|
-| 20 | 48 | greedy-first-fit | 32 | 64 | 480 | 60 | 0.007 | n/a |
-| 20 | 48 | cp-sat | 40 | 72 | 300 | 60 | 0.379 | OPTIMAL |
-| 50 | 120 | greedy-first-fit | 80 | 161 | 1200 | 60 | 0.039 | n/a |
-| 50 | 120 | cp-sat | 100 | 181 | 1095 | 60 | 0.677 | OPTIMAL |
-| 100 | 240 | greedy-first-fit | 160 | 351 | 2400 | 60 | 0.155 | n/a |
-| 100 | 240 | cp-sat | 200 | 391 | 2580 | 90 | 1.056 | OPTIMAL |
+Measured on macOS 27.2 arm64, Python 3.12.15, OR-Tools 9.15.6755, uv 0.13.5.
+All inputs are **synthetic**. Independent pods repeat contention/packing motifs;
+the ring family shares specialist skills across neighboring pods. Neither is an
+arbitrary dense scheduling graph. Both algorithms receive identical workloads.
 
-Measured locally on macOS arm64, CPython 3.12.15, OR-Tools 9.15.6755 and uv 0.13.5.
-`Solve-s` includes construction and optimization (and the optimizer's greedy warm
-start); it excludes explanation extraction, file I/O and package startup. Gaps are
-sum of last-end minus first-start minus occupied minutes per person/local day.
-They include internal buffer time but exclude leading/trailing idle time.
+| Family | People | Search budget | Greedy meetings | Solver meetings | Priority / upper bound | Priority status | Solve seconds |
+|---|---:|---:|---:|---:|---:|---|---:|
+| Independent | 200 | 0.1 | 320 | 320 | 714 / — | UNKNOWN, greedy fallback | 0.762 |
+| Independent | 200 | 10 | 320 | 399 | 792 / 794 | FEASIBLE | 1.517 |
+| Independent | 200 | 60 | 320 | 400 | 794 / 794 | OPTIMAL | 7.000 |
+| Independent | 500 | 0.1 | 800 | 800 | 1780 / — | UNKNOWN, greedy fallback | 5.429 |
+| Independent | 500 | 10 | 800 | 800 | 1780 / — | UNKNOWN, greedy fallback | 6.317 |
+| Independent | 500 | 60 | 800 | 804 | 1784 / 1980 | FEASIBLE | 9.446 |
+| Ring | 200 | 0.1 | 320 | 320 | 714 / — | UNKNOWN, greedy fallback | 0.774 |
+| Ring | 200 | 10 | 320 | 367 | 719 / 794 | FEASIBLE | 1.669 |
+| Ring | 200 | 60 | 320 | 400 | 794 / 794 | OPTIMAL | 15.176 |
+| Ring | 500 | 0.1 | 800 | 800 | 1780 / — | UNKNOWN, greedy fallback | 5.528 |
+| Ring | 500 | 10 | 800 | 800 | 1780 / — | UNKNOWN, greedy fallback | 6.325 |
+| Ring | 500 | 60 | 800 | 805 | 1783 / 1980 | FEASIBLE | 10.762 |
 
-The generator repeats synthetic contention/packing motifs with interchangeable
-skill providers. A shared reviewer role introduces redundant cross-pod candidates;
-staffing dominance pruning removes those only when mathematically safe. This is a
-structured workload, not a broad random-calendar or production benchmark. Both
-algorithms receive identical inputs. Greedy processes input order, takes the first
-legal grid slot, and greedily fills skills without considering future requests.
+At 200 people / budget 60, independent gaps increased from greedy's 4800 to 4980
+minutes and spread increased from 60 to 90. Higher priority is not a win on every
+secondary metric. At 500 people the short budgets found no CP incumbent; fallback
+results are labelled, not reported as optimal. The 0.1 budget still takes seconds
+because construction and greedy dominate. These results identify a scalability
+limit rather than conceal it.
 
-The priority pass proved optimal at every scale. Several secondary passes stopped
-with feasible incumbents. In the largest run, priority increased from 351 to 391,
-but gaps increased from 2400 to 2580 and load spread increased from 60 to 90 minutes.
-More meetings is not an automatic win on every secondary metric. Full pass values
-and bounds: [`evidence/benchmark.json`](evidence/benchmark.json). The repeated run
-matched all non-timing metrics; timings are hardware/load dependent.
+[Full tables](evidence/v0.2-curves.md) · [Metrics, bounds and environment](evidence/v0.2-curves.json).
+All 24 resulting greedy/optimized schedules passed independent hard-constraint
+validation. The benchmark writes full workload/result JSON and environment metadata
+so individual runs can be inspected or regenerated.
 
-## What's hard here
-
-- **Local dates and combined buffers.** Compute in UTC, convert padded endpoints to
-  local working hours, and count caps by attendee-local meeting date, including DST.
-- **Honest infeasibility.** A sufficient unsat core is not minimal. Delete members
-  and re-solve; distinguish fixed-schedule insertion from globally movable meetings.
-- **Search size without changing the problem.** Replace slot truth tables with
-  integer domains. Prune role-only staff when another requirement implies the role;
-  disable that reduction under hard fairness because extra staff may be necessary.
-
-## Tests and CI
+## Tests and distribution builds
 
 ```sh
 uv run ruff check .
 uv run ruff format --check .
 uv run pytest --cov=schedule_solver --cov-report=term-missing --cov-fail-under=90 -q
+uv build
 ```
 
-Observed: **75 tests passed; 95.62% statement coverage.** Tests include a small
-exhaustive priority oracle, an independent schedule-validity checker, DST folds,
-local-day caps, buffers, fairness, minimal certificates, real CLI subprocesses,
-FastAPI HTTP contracts, ICS parsing and the optional provider HTTP boundary.
-Upstream Starlette/httpx and, in the clean clone, bool-inversion import deprecation
-warnings remain visible; no test fails.
-CI runs lint, format, coverage and an offline demo. No live LLM key is used in tests.
+Observed: **129 tests passed, 95.91% statement coverage**. Tests execute real
+OR-Tools, dateutil, icalendar, CLI subprocesses and FastAPI contracts, including DST
+gaps/folds, recurrence exclusions, re-solve stability, exhaustive small conflict
+subsets, malformed assignments and the native objective-handoff regression.
+The upstream Starlette/httpx deprecation warning remains visible.
 
-A [clean local clone](evidence/clean-clone.md) also passed frozen installation,
-lint, format, all tests and the offline demo, importing its own package.
+Wheel and sdist build locally as `dist/schedule_solver-0.2.0-py3-none-any.whl` and
+`dist/schedule_solver-0.2.0.tar.gz`. Nothing is published or tagged.
+[Fresh local clone and isolated wheel evidence](evidence/v0.2-verification.md)
+records installation, full tests, lint, formatting, build and the offline demo.
+CI uses the same lint, format, coverage and demo commands; no live LLM key is used.
 
-## Optional narrator
+## Optional narrator and remaining limits
 
-Default `--provider mock` is deterministic and offline. To explicitly send computed
-certificate data to an OpenAI-compatible endpoint:
+Default `--provider mock` is deterministic and offline. Explicit OpenAI-compatible
+narration uses `SCHEDULE_LLM_BASE_URL`, `SCHEDULE_LLM_API_KEY`, and `--provider openai
+--model ...`. Only computed explanations are sent, but those can contain attendee
+IDs and times: obtain permission before sending private calendar data. A narrator
+cannot alter assignments or proof certificates. Real hosted-provider behavior has
+not been tested with a paid key; HTTP boundaries use an injected test transport.
 
-```sh
-export SCHEDULE_LLM_BASE_URL="https://api.openai.com/v1"
-# Set SCHEDULE_LLM_API_KEY in your shell; never commit it.
-uv run schedule-solver demo --people 5 --provider openai --model gpt-4o-mini
-```
+The UTC grid can miss a continuous-time start. Fairness is not capacity-normalized.
+Rooms/resources, weighted preferred times/back-to-back penalties, detached calendar
+overrides, globally movable repair proofs and worker-isolated production HTTP jobs
+are future work, not stubbed modules. See [ROADMAP.md](ROADMAP.md).
 
-Only explanations are sent, not calendar files. Explanations can still contain
-attendee IDs and times: obtain permission before sending private calendar data.
-Provider errors are surfaced. Hosted-provider execution was **not** tested with a
-real key; the HTTP contract was tested with an injected transport.
-
-## Design decisions and limitations
-
-- Discrete UTC start grid, not continuous time. A coarse grid can miss a valid start.
-  Durations and buffers are exact integral minutes, not rounded to grid size.
-- All meetings and padded working hours stay within one attendee-local day.
-  Split overnight shifts into explicit same-day schedules; overnight working-hours
-  definitions are rejected. Meeting bodies must fit the horizon; buffers must fit
-  availability and working hours.
-- Fairness is raw meeting-minute spread across all people, not capacity-normalized
-  utilization. Optional `max_load_difference_minutes` is a hard horizon-wide cap.
-- Explicit ICS VEVENTs only. TZID and all-day events work. Floating timestamps,
-  recurrence rules/dates/exclusions and recurrence overrides are rejected; expand
-  them before import. Cancelled/transparent events do not block.
-- Bounded synchronous local API: dense models and diagnosis can still be expensive.
-  No hosted multi-user service, authentication, booking writes or calendar sync.
-- Secondary objective optimality is not guaranteed at a finite search budget.
-  Fixed-schedule certificates do not compute globally minimal rescheduling repairs.
-
-[DESIGN.md](DESIGN.md) covers the model, proof boundaries and interview notes.
-
-### Roadmap
-
-Broader density/seed benchmark distributions; capacity-normalized fairness;
-movable-meeting repair certificates; bounded recurrence expansion; worker-isolated
-HTTP jobs with cancellation and admission control. None is a stub in this release.
-
-MIT licensed. Built from scratch with synthetic inputs; no employer code or data.
+MIT licensed. Original code and synthetic inputs; no employer code, prompts or data.

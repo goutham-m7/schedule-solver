@@ -70,7 +70,7 @@ def parser():
         command.add_argument("--output", type=Path, default=Path("artifacts"))
     command = commands.add_parser(
         "import-ics",
-        help="Merge explicit ICS busy blocks into a person's JSON calendar",
+        help="Merge horizon-bounded ICS busy events into a person's JSON calendar",
     )
     command.add_argument("input", type=Path)
     command.add_argument("person")
