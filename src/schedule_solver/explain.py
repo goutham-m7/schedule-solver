@@ -6,6 +6,8 @@ other meetings cannot accommodate the excluded request.
 
 from collections import Counter
 from datetime import timedelta
+from itertools import combinations
+from time import perf_counter
 from zoneinfo import ZoneInfo
 
 from ortools.sat.python import cp_model
@@ -129,7 +131,7 @@ class InsertionModel:
                         <= work.max_load_difference_minutes
                     ).only_enforce_if(label("fairness"))
 
-    def check(self, enabled: set[str] | None = None):
+    def check(self, enabled: set[str] | None = None, *, time_limit: float = 5):
         if enabled is None:
             enabled = set(self.labels)
         self.model.clear_assumptions()
@@ -137,7 +139,7 @@ class InsertionModel:
             [var if name in enabled else var.Not() for name, var in self.labels.items()]
         )
         engine = cp_model.CpSolver()
-        engine.parameters.max_time_in_seconds = 5
+        engine.parameters.max_time_in_seconds = max(0.001, time_limit)
         engine.parameters.num_search_workers = 1
         status = engine.solve(self.model)
         if status not in (cp_model.OPTIMAL, cp_model.FEASIBLE, cp_model.INFEASIBLE):
@@ -161,6 +163,26 @@ class InsertionModel:
             if not self.check(core - {name})[0]:
                 core.remove(name)
         return sorted(core)
+
+    def minimum_conflict(self, max_labels: int = 12):
+        """Search the entire small universe, not just subsets of an arbitrary core."""
+        if not 0 <= max_labels <= 12:
+            raise ValueError("max_labels must be between 0 and 12")
+        core = self.minimal_conflict()
+        if core is None:
+            return None, "none"
+        if len(self.labels) > max_labels:
+            return core, "inclusion-minimal"
+        deadline = perf_counter() + 5
+        labels = sorted(self.labels)
+        for size in range(len(core) + 1):
+            for subset in combinations(labels, size):
+                remaining = deadline - perf_counter()
+                if remaining <= 0:
+                    raise RuntimeError("minimum-cardinality diagnosis did not finish")
+                if not self.check(set(subset), time_limit=remaining)[0]:
+                    return list(subset), "minimum-cardinality"
+        raise RuntimeError("minimum-cardinality diagnosis lost its known conflict")
 
 
 def insertion_feasible(
@@ -235,7 +257,9 @@ def explain_result(work: Workload, result: Result) -> Result:
                 )
             )
         else:
-            conflict = InsertionModel(work, result, request).minimal_conflict()
+            conflict, guarantee = InsertionModel(
+                work, result, request
+            ).minimum_conflict()
             context = [
                 f"Required attendees={request.required_attendees}; skills={request.skills}; roles={request.roles}.",
                 "Eligibility restricts attendees to named people or holders of a requested skill/role.",
@@ -252,11 +276,16 @@ def explain_result(work: Workload, result: Result) -> Result:
                     facts=[
                         "Insertion is feasible: omission reflects an objective trade-off or search time limit."
                         if conflict is None
-                        else "Deletion-minimal conflict with the returned schedule held fixed; not minimum-cardinality and not a claim about rearranging meetings."
+                        else (
+                            "Minimum-cardinality conflict with the returned schedule held fixed; not a claim about rearranging meetings."
+                            if guarantee == "minimum-cardinality"
+                            else "Deletion-minimal conflict with the returned schedule held fixed; not minimum-cardinality and not a claim about rearranging meetings."
+                        )
                     ]
                     + context,
                     conflict=conflict or [],
                     minimal=conflict is not None,
+                    guarantee=guarantee,
                 )
             )
     return result.model_copy(update={"explanations": explanations})

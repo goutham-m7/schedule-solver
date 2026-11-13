@@ -174,6 +174,7 @@ class Explanation(StrictModel):
     facts: list[str]
     conflict: list[str] = Field(default_factory=list)
     minimal: bool = False
+    guarantee: str = "none"
 
 
 class Result(StrictModel):
