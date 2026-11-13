@@ -1,0 +1,30 @@
+{
+  "python_resolve_changed": [],
+  "recurrence_starts": [
+    "2027-03-07T14:00:00+00:00",
+    "2027-03-14T13:00:00+00:00"
+  ],
+  "small_certificate": {
+    "request_id": "pod0-long0",
+    "kind": "insertion_conflict",
+    "facts": [
+      "Minimum-cardinality conflict with the returned schedule held fixed; not a claim about rearranging meetings.",
+      "Required attendees=['p000']; skills={}; roles={}.",
+      "Eligibility restricts attendees to named people or holders of a requested skill/role."
+    ],
+    "conflict": [
+      "cap:p000:2027-01-04"
+    ],
+    "minimal": true,
+    "guarantee": "minimum-cardinality"
+  },
+  "http": {
+    "solve_status": 200,
+    "resolve_status": 200,
+    "resolve_changed": [],
+    "export_status": 200,
+    "export_events": 10,
+    "invalid_status": 422
+  },
+  "readme_cli_examples": "all three passed"
+}

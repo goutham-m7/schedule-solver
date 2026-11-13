@@ -46,11 +46,11 @@ Local-only milestone. All workloads and measurements are synthetic. No remote op
 
 ### 06. Build and verify v0.2.0 distributions
 
-- Status: implemented; fresh-clone and isolated-wheel verification pending.
+- Status: complete.
 - Problem: The release needs reproducible installation and documented contracts.
 - Acceptance: Bump package and API version; build wheel and sdist locally, install wheel into an isolated environment and exercise entry point; refresh README, changelog and fresh-clone verification evidence. No publication or tags.
 - Test plan: Full pytest, Ruff, build, isolated wheel CLI and fresh local clone install/test/lint/demo.
-- Delivery commits: pending.
+- Delivery commits: `385ec3e^..385ec3e`; fresh-clone and wheel evidence is recorded in `evidence/v0.2-verification.md`.
 
 ## Future work
 
