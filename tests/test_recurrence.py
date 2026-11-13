@@ -99,3 +99,48 @@ def test_rdate_and_exdate_without_rrule():
         "RDATE:20270308T090000Z,20270309T090000Z\nEXDATE:20270307T090000Z",
     )
     assert [p.start.day for p in import_ics(text, "UTC", horizon())] == [8, 9]
+
+
+def test_duration_hours_remain_elapsed_across_spring_gap():
+    text = (
+        "BEGIN:VCALENDAR\nBEGIN:VEVENT\n"
+        "DTSTART;TZID=America/New_York:20270313T013000\n"
+        "DURATION:PT2H\nRRULE:FREQ=DAILY;COUNT=2\nEND:VEVENT\nEND:VCALENDAR"
+    )
+    periods = import_ics(text, "UTC", horizon())
+    assert [(p.end - p.start).total_seconds() for p in periods] == [7200, 7200]
+
+
+@pytest.mark.parametrize(
+    "body",
+    [
+        "DTEND:20270307T100000Z",
+        "DTSTART:20270307T090000Z",
+        "DTSTART:20270307T090000Z\nDTEND:20270307T100000Z\nDURATION:PT1H",
+        "DTSTART;VALUE=DATE:20270307\nDTEND:20270308T100000Z",
+        "DTSTART:20270307T090000Z\nDURATION:PT0H",
+        "DTSTART:20270307T090000Z\nDURATION:PT1H\nEXDATE;VALUE=DATE:20270307",
+        "DTSTART:20270307T090000Z\nDURATION:PT1H\nRRULE:FREQ=DAILY;COUNT=0",
+        "DTSTART:20270307T090000Z\nDURATION:PT1H\nRRULE:FREQ=DAILY;COUNT=2;UNTIL=20270309T090000Z",
+        "DTSTART;VALUE=DATE:20270307\nDURATION:PT1H",
+    ],
+)
+def test_invalid_event_contracts_fail_closed(body):
+    with pytest.raises(ValueError):
+        import_ics(
+            f"BEGIN:VCALENDAR\nBEGIN:VEVENT\n{body}\nEND:VEVENT\nEND:VCALENDAR",
+            "UTC",
+            horizon(),
+        )
+
+
+def test_default_all_day_end_and_cancelled_transparent_blocks():
+    text = (
+        "BEGIN:VCALENDAR\n"
+        "BEGIN:VEVENT\nDTSTART;VALUE=DATE:20270307\nEND:VEVENT\n"
+        "BEGIN:VEVENT\nTRANSP:TRANSPARENT\nEND:VEVENT\n"
+        "BEGIN:VEVENT\nSTATUS:CANCELLED\nEND:VEVENT\nEND:VCALENDAR"
+    )
+    periods = import_ics(text, "UTC", horizon())
+    assert len(periods) == 1
+    assert (periods[0].end - periods[0].start).total_seconds() == 86400

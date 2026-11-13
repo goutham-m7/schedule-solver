@@ -105,3 +105,17 @@ def test_http_resolve_and_openapi_contract(payload):
         ).status_code
         == 422
     )
+
+
+def test_meeting_contract_normalizes_dst_duration():
+    from datetime import datetime
+    from zoneinfo import ZoneInfo
+
+    zone = ZoneInfo("America/New_York")
+    meeting = Meeting(
+        request_id="dst",
+        start=datetime(2027, 3, 14, 1, 30, tzinfo=zone),
+        end=datetime(2027, 3, 14, 3, 30, tzinfo=zone),
+        attendees=["ada"],
+    )
+    assert (meeting.end - meeting.start).total_seconds() == 3600

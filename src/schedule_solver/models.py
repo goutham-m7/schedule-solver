@@ -145,11 +145,9 @@ class Workload(Period):
         return self.start.astimezone(UTC) + timedelta(minutes=minute)
 
 
-class Meeting(StrictModel):
-    request_id: str
-    start: AwareDatetime
-    end: AwareDatetime
-    attendees: list[str]
+class Meeting(Period):
+    request_id: str = Field(min_length=1, max_length=100)
+    attendees: list[str] = Field(min_length=1, max_length=500)
 
 
 class ObjectivePass(StrictModel):

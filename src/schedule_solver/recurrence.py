@@ -40,7 +40,7 @@ def event_periods(event, zone, horizon, max_occurrences):
 
     first, last = local(start), local(end)
     Period(start=first, end=last)
-    # DTEND gives an exact elapsed duration; all-day / DURATION use nominal local time.
+    # DTEND is elapsed; DURATION adds local days first, then elapsed hours/minutes.
     nominal = all_day or "DURATION" in event
     duration = end - start if nominal else last.astimezone(UTC) - first.astimezone(UTC)
     if duration <= timedelta():
@@ -98,7 +98,13 @@ def event_periods(event, zone, horizon, max_occurrences):
     for instant, occurrence in sorted(occurrences.items()):
         if instant in excluded or not datetime_exists(occurrence):
             continue
-        end = occurrence + duration if nominal else instant + duration
+        if nominal:
+            local_day = occurrence + timedelta(days=duration.days)
+            end = local_day.astimezone(UTC) + timedelta(
+                seconds=duration.seconds, microseconds=duration.microseconds
+            )
+        else:
+            end = instant + duration
         if not datetime_exists(end):
             raise ValueError("VEVENT ends at a nonexistent local time")
         period = Period(start=occurrence, end=end)
