@@ -1,5 +1,7 @@
 """Optional commentary only: an LLM cannot alter optimization or certificates."""
 
+from urllib.parse import urlsplit
+
 import httpx
 
 from .models import Explanation
@@ -18,10 +20,24 @@ class OpenAINarrator:
     def __init__(self, base_url: str, key: str, model: str, client: httpx.Client):
         if not key or not model:
             raise ValueError("provider key and model must not be empty")
-        if not base_url.startswith(
-            ("https://", "http://localhost:", "http://127.0.0.1:")
+        endpoint = urlsplit(base_url)
+        secure = endpoint.scheme == "https"
+        loopback = endpoint.scheme == "http" and endpoint.hostname in {
+            "localhost",
+            "127.0.0.1",
+            "::1",
+        }
+        if (
+            not endpoint.hostname
+            or not (secure or loopback)
+            or endpoint.username is not None
+            or endpoint.password is not None
+            or endpoint.query
+            or endpoint.fragment
         ):
-            raise ValueError("provider base URL requires HTTPS (or loopback HTTP)")
+            raise ValueError(
+                "provider base URL requires HTTPS (or loopback HTTP), without credentials, query or fragment"
+            )
         self.base_url, self.key, self.model, self.client = (
             base_url.rstrip("/"),
             key,
