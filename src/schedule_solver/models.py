@@ -21,6 +21,11 @@ class Period(StrictModel):
     start: AwareDatetime
     end: AwareDatetime
 
+    @field_validator("start", "end")
+    @classmethod
+    def normalize_utc(cls, value):
+        return value.astimezone(UTC)
+
     @model_validator(mode="after")
     def ordered(self):
         if self.start >= self.end:
@@ -78,6 +83,11 @@ class Request(StrictModel):
     skills: dict[str, int] = Field(default_factory=dict)
     roles: dict[str, int] = Field(default_factory=dict)
     priority: int = Field(default=1, ge=1, le=1000)
+
+    @field_validator("earliest", "latest")
+    @classmethod
+    def normalize_utc(cls, value):
+        return value.astimezone(UTC)
 
     @model_validator(mode="after")
     def valid(self):

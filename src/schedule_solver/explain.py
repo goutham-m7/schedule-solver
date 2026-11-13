@@ -10,7 +10,7 @@ from zoneinfo import ZoneInfo
 
 from ortools.sat.python import cp_model
 
-from .calendars import legal_starts, overlaps, padded, slots, static_reasons
+from .calendars import eligible, legal_starts, overlaps, padded, slots, static_reasons
 from .models import Explanation, Request, Result, Workload
 
 
@@ -34,6 +34,11 @@ class InsertionModel:
                 self.labels[name] = model.new_bool_var(name)
             return self.labels[name]
 
+        for p in work.people:
+            if not eligible(p, request):
+                model.add(self.people[p.id] == 0).only_enforce_if(
+                    label(f"eligibility:{request.id}")
+                )
         if not possible:
             model.add(False).only_enforce_if(label(f"horizon:{request.id}"))
         else:

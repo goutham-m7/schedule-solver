@@ -5,10 +5,9 @@ from datetime import timedelta
 from time import perf_counter
 from zoneinfo import ZoneInfo
 
-from .calendars import legal_starts, overlaps, padded, slots
+from .calendars import eligible, legal_starts, overlaps, padded, slots
 from .metrics import result_for
 from .models import Meeting, Workload
-from .solver import eligible
 
 
 def greedy(work: Workload):

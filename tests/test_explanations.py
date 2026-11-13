@@ -29,8 +29,12 @@ def test_missing_skill_certificate(payload):
     work = Workload.model_validate(payload)
     result = explain_result(work, solve(work))
     e = result.explanations[0]
-    assert e.conflict == ["skills:unknown"]
+    # Several inclusion-minimal cores can exist; no eligible person is also
+    # sufficient when the requested skill is absent from the entire roster.
+    assert e.conflict in (["skills:unknown"], ["eligibility:unknown"])
     assert e.minimal
+    assert not insertion_feasible(work, result, work.requests[0], set(e.conflict))
+    assert insertion_feasible(work, result, work.requests[0], set())
 
 
 def test_cap_certificate(payload):

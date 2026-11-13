@@ -8,6 +8,14 @@ from icalendar import Calendar
 from .models import Period, Person, Request, Workload
 
 
+def eligible(person, request):
+    return (
+        person.id in request.required_attendees + request.optional_attendees
+        or bool(person.skills & request.skills.keys())
+        or bool(person.roles & request.roles.keys())
+    )
+
+
 def overlaps(a: datetime, b: datetime, c: datetime, d: datetime) -> bool:
     return a < d and c < b
 

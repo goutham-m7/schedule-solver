@@ -6,17 +6,10 @@ from zoneinfo import ZoneInfo
 
 from ortools.sat.python import cp_model
 
-from .calendars import legal_starts, slots
+from .calendars import eligible, legal_starts, slots
+from .greedy import greedy
 from .metrics import result_for
 from .models import Meeting, ObjectivePass, Workload
-
-
-def eligible(person, request):
-    return (
-        person.id in request.required_attendees + request.optional_attendees
-        or bool(person.skills & request.skills.keys())
-        or bool(person.roles & request.roles.keys())
-    )
 
 
 def solve(work: Workload, time_limit: float = 10.0):
@@ -28,6 +21,8 @@ def solve(work: Workload, time_limit: float = 10.0):
     if not 0 < time_limit <= 120:
         raise ValueError("time_limit must be in (0, 120] seconds")
     begun = perf_counter()
+    warm_start = greedy(work)
+    warm_meetings = {m.request_id: m for m in warm_start.meetings}
     model = cp_model.CpModel()
     present, starts, attendance = {}, {}, {}
     intervals, daily = defaultdict(list), defaultdict(list)
@@ -164,6 +159,23 @@ def solve(work: Workload, time_limit: float = 10.0):
     model.add_max_equality(high, loads)
     if work.max_load_difference_minutes is not None:
         model.add(high - low <= work.max_load_difference_minutes)
+    for r in work.requests:
+        meeting = warm_meetings.get(r.id)
+        model.add_hint(present[r.id], int(meeting is not None))
+        minute = (
+            int((meeting.start - work.start).total_seconds() // 60) if meeting else 0
+        )
+        model.add_hint(starts[r.id], minute // work.grid_minutes)
+        for p in work.people:
+            if (r.id, p.id) in attendance:
+                model.add_hint(
+                    attendance[r.id, p.id],
+                    int(meeting is not None and p.id in meeting.attendees),
+                )
+    model.add(
+        sum(r.priority * present[r.id] for r in work.requests)
+        >= warm_start.metrics.priority_scheduled
+    )
     objectives = [
         ("priority", sum(r.priority * present[r.id] for r in work.requests), True),
         ("staffing", sum(unnecessary), False),
@@ -201,7 +213,7 @@ def solve(work: Workload, time_limit: float = 10.0):
         model.clear_hints()
         for var in all_bools + list(starts.values()):
             model.add_hint(var, engine.value(var))
-    meetings = []
+    meetings = [] if best is not None else warm_start.meetings
     if best is not None:
         for r in work.requests:
             if best.value(present[r.id]):
@@ -219,6 +231,7 @@ def solve(work: Workload, time_limit: float = 10.0):
                         ],
                     )
                 )
-    result = result_for(work, meetings, perf_counter() - begun, "cp-sat")
+    algorithm = "cp-sat" if best is not None else "cp-sat/greedy-warm-start"
+    result = result_for(work, meetings, perf_counter() - begun, algorithm)
     result.passes = passes
     return result
