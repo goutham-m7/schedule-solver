@@ -1,0 +1,155 @@
+[
+  {
+    "people": 20,
+    "requests": 48,
+    "seed": 7,
+    "greedy": {
+      "meetings_scheduled": 32,
+      "priority_scheduled": 64,
+      "gap_minutes": 480,
+      "active_person_days": 20,
+      "load_spread_minutes": 60,
+      "solve_seconds": 0.007458499982021749
+    },
+    "optimized": {
+      "meetings_scheduled": 40,
+      "priority_scheduled": 72,
+      "gap_minutes": 300,
+      "active_person_days": 20,
+      "load_spread_minutes": 60,
+      "solve_seconds": 0.3794935420155525
+    },
+    "passes": [
+      {
+        "name": "priority",
+        "status": "OPTIMAL",
+        "value": 72,
+        "bound": 72.0
+      },
+      {
+        "name": "staffing",
+        "status": "FEASIBLE",
+        "value": 16,
+        "bound": 1.0
+      },
+      {
+        "name": "fragmentation",
+        "status": "FEASIBLE",
+        "value": 300,
+        "bound": 0.0
+      },
+      {
+        "name": "fairness",
+        "status": "OPTIMAL",
+        "value": 60,
+        "bound": 60.0
+      },
+      {
+        "name": "attendance",
+        "status": "OPTIMAL",
+        "value": -20,
+        "bound": -20.0
+      }
+    ]
+  },
+  {
+    "people": 50,
+    "requests": 120,
+    "seed": 7,
+    "greedy": {
+      "meetings_scheduled": 80,
+      "priority_scheduled": 161,
+      "gap_minutes": 1200,
+      "active_person_days": 50,
+      "load_spread_minutes": 60,
+      "solve_seconds": 0.038857041974551976
+    },
+    "optimized": {
+      "meetings_scheduled": 100,
+      "priority_scheduled": 181,
+      "gap_minutes": 1095,
+      "active_person_days": 50,
+      "load_spread_minutes": 60,
+      "solve_seconds": 0.6773619579616934
+    },
+    "passes": [
+      {
+        "name": "priority",
+        "status": "OPTIMAL",
+        "value": 181,
+        "bound": 181.0
+      },
+      {
+        "name": "staffing",
+        "status": "FEASIBLE",
+        "value": 40,
+        "bound": 1.0
+      },
+      {
+        "name": "fragmentation",
+        "status": "FEASIBLE",
+        "value": 1095,
+        "bound": 0.0
+      },
+      {
+        "name": "fairness",
+        "status": "OPTIMAL",
+        "value": 60,
+        "bound": 60.0
+      },
+      {
+        "name": "attendance",
+        "status": "OPTIMAL",
+        "value": -50,
+        "bound": -50.0
+      }
+    ]
+  },
+  {
+    "people": 100,
+    "requests": 240,
+    "seed": 7,
+    "greedy": {
+      "meetings_scheduled": 160,
+      "priority_scheduled": 351,
+      "gap_minutes": 2400,
+      "active_person_days": 100,
+      "load_spread_minutes": 60,
+      "solve_seconds": 0.15514849999453872
+    },
+    "optimized": {
+      "meetings_scheduled": 200,
+      "priority_scheduled": 391,
+      "gap_minutes": 2580,
+      "active_person_days": 100,
+      "load_spread_minutes": 90,
+      "solve_seconds": 1.056263375096023
+    },
+    "passes": [
+      {
+        "name": "priority",
+        "status": "OPTIMAL",
+        "value": 391,
+        "bound": 391.0
+      },
+      {
+        "name": "staffing",
+        "status": "FEASIBLE",
+        "value": 80,
+        "bound": 1.0
+      },
+      {
+        "name": "fragmentation",
+        "status": "FEASIBLE",
+        "value": 2580,
+        "bound": 0.0
+      },
+      {
+        "name": "fairness",
+        "status": "UNKNOWN",
+        "value": null,
+        "bound": null
+      }
+    ]
+  }
+]

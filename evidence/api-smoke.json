@@ -1,0 +1,45 @@
+{
+  "command": "POST http://127.0.0.1:8767/solve with examples/workload.json under workload, time_limit=2",
+  "status": 200,
+  "metrics": {
+    "meetings_scheduled": 10,
+    "priority_scheduled": 20,
+    "gap_minutes": 30,
+    "active_person_days": 5,
+    "load_spread_minutes": 60,
+    "solve_seconds": 0.05982387496624142
+  },
+  "passes": [
+    {
+      "name": "priority",
+      "status": "OPTIMAL",
+      "value": 20,
+      "bound": 20.0
+    },
+    {
+      "name": "staffing",
+      "status": "OPTIMAL",
+      "value": 4,
+      "bound": 4.0
+    },
+    {
+      "name": "fragmentation",
+      "status": "OPTIMAL",
+      "value": 30,
+      "bound": 30.0
+    },
+    {
+      "name": "fairness",
+      "status": "OPTIMAL",
+      "value": 60,
+      "bound": 60.0
+    },
+    {
+      "name": "attendance",
+      "status": "OPTIMAL",
+      "value": -5,
+      "bound": -5.0
+    }
+  ],
+  "explanation_count": 12
+}

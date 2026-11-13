@@ -1,0 +1,8 @@
+| People | Requests | Algorithm | Scheduled | Priority | Gap-min | Spread-min | Solve-s | Priority status |
+|---:|---:|:---|---:|---:|---:|---:|---:|:---|
+| 20 | 48 | greedy-first-fit | 32 | 64 | 480 | 60 | 0.007 | n/a |
+| 20 | 48 | cp-sat | 40 | 72 | 300 | 60 | 0.379 | OPTIMAL |
+| 50 | 120 | greedy-first-fit | 80 | 161 | 1200 | 60 | 0.039 | n/a |
+| 50 | 120 | cp-sat | 100 | 181 | 1095 | 60 | 0.677 | OPTIMAL |
+| 100 | 240 | greedy-first-fit | 160 | 351 | 2400 | 60 | 0.155 | n/a |
+| 100 | 240 | cp-sat | 200 | 391 | 2580 | 90 | 1.056 | OPTIMAL |

@@ -1,0 +1,329 @@
+{
+  "start": "2027-01-04T09:00:00Z",
+  "end": "2027-01-04T12:00:00Z",
+  "people": [
+    {
+      "id": "p000",
+      "timezone": "UTC",
+      "skills": [
+        "planning"
+      ],
+      "roles": [
+        "owner"
+      ],
+      "availability": [
+        {
+          "start": "2027-01-04T09:00:00Z",
+          "end": "2027-01-04T12:00:00Z"
+        }
+      ],
+      "busy": [],
+      "working_hours": {
+        "weekdays": [
+          0,
+          1,
+          2,
+          3,
+          4
+        ],
+        "start": "09:00:00",
+        "end": "12:00:00"
+      },
+      "max_meetings_per_day": 6,
+      "buffer_before_minutes": 0,
+      "buffer_after_minutes": 0
+    },
+    {
+      "id": "p001",
+      "timezone": "UTC",
+      "skills": [
+        "planning"
+      ],
+      "roles": [
+        "owner"
+      ],
+      "availability": [
+        {
+          "start": "2027-01-04T09:00:00Z",
+          "end": "2027-01-04T12:00:00Z"
+        }
+      ],
+      "busy": [],
+      "working_hours": {
+        "weekdays": [
+          0,
+          1,
+          2,
+          3,
+          4
+        ],
+        "start": "09:00:00",
+        "end": "12:00:00"
+      },
+      "max_meetings_per_day": 6,
+      "buffer_before_minutes": 0,
+      "buffer_after_minutes": 0
+    },
+    {
+      "id": "p002",
+      "timezone": "UTC",
+      "skills": [
+        "planning"
+      ],
+      "roles": [
+        "owner"
+      ],
+      "availability": [
+        {
+          "start": "2027-01-04T09:00:00Z",
+          "end": "2027-01-04T12:00:00Z"
+        }
+      ],
+      "busy": [],
+      "working_hours": {
+        "weekdays": [
+          0,
+          1,
+          2,
+          3,
+          4
+        ],
+        "start": "09:00:00",
+        "end": "12:00:00"
+      },
+      "max_meetings_per_day": 6,
+      "buffer_before_minutes": 0,
+      "buffer_after_minutes": 0
+    },
+    {
+      "id": "p003",
+      "timezone": "UTC",
+      "skills": [
+        "build-0"
+      ],
+      "roles": [
+        "reviewer"
+      ],
+      "availability": [
+        {
+          "start": "2027-01-04T09:00:00Z",
+          "end": "2027-01-04T11:30:00Z"
+        }
+      ],
+      "busy": [],
+      "working_hours": {
+        "weekdays": [
+          0,
+          1,
+          2,
+          3,
+          4
+        ],
+        "start": "09:00:00",
+        "end": "12:00:00"
+      },
+      "max_meetings_per_day": 6,
+      "buffer_before_minutes": 5,
+      "buffer_after_minutes": 5
+    },
+    {
+      "id": "p004",
+      "timezone": "America/New_York",
+      "skills": [
+        "build-0"
+      ],
+      "roles": [
+        "reviewer"
+      ],
+      "availability": [
+        {
+          "start": "2027-01-04T09:30:00Z",
+          "end": "2027-01-04T12:00:00Z"
+        }
+      ],
+      "busy": [],
+      "working_hours": {
+        "weekdays": [
+          0,
+          1,
+          2,
+          3,
+          4
+        ],
+        "start": "04:00:00",
+        "end": "07:00:00"
+      },
+      "max_meetings_per_day": 6,
+      "buffer_before_minutes": 5,
+      "buffer_after_minutes": 5
+    }
+  ],
+  "requests": [
+    {
+      "id": "pod0-long0",
+      "duration_minutes": 120,
+      "earliest": "2027-01-04T09:00:00Z",
+      "latest": "2027-01-04T11:00:00Z",
+      "required_attendees": [
+        "p000"
+      ],
+      "optional_attendees": [],
+      "skills": {},
+      "roles": {},
+      "priority": 3
+    },
+    {
+      "id": "pod0-first0",
+      "duration_minutes": 60,
+      "earliest": "2027-01-04T09:00:00Z",
+      "latest": "2027-01-04T10:00:00Z",
+      "required_attendees": [
+        "p000"
+      ],
+      "optional_attendees": [],
+      "skills": {},
+      "roles": {},
+      "priority": 2
+    },
+    {
+      "id": "pod0-second0",
+      "duration_minutes": 60,
+      "earliest": "2027-01-04T10:00:00Z",
+      "latest": "2027-01-04T11:00:00Z",
+      "required_attendees": [
+        "p000"
+      ],
+      "optional_attendees": [],
+      "skills": {},
+      "roles": {},
+      "priority": 2
+    },
+    {
+      "id": "pod0-long1",
+      "duration_minutes": 120,
+      "earliest": "2027-01-04T09:00:00Z",
+      "latest": "2027-01-04T11:00:00Z",
+      "required_attendees": [
+        "p001"
+      ],
+      "optional_attendees": [],
+      "skills": {},
+      "roles": {},
+      "priority": 3
+    },
+    {
+      "id": "pod0-first1",
+      "duration_minutes": 60,
+      "earliest": "2027-01-04T09:00:00Z",
+      "latest": "2027-01-04T10:00:00Z",
+      "required_attendees": [
+        "p001"
+      ],
+      "optional_attendees": [],
+      "skills": {},
+      "roles": {},
+      "priority": 2
+    },
+    {
+      "id": "pod0-second1",
+      "duration_minutes": 60,
+      "earliest": "2027-01-04T10:00:00Z",
+      "latest": "2027-01-04T11:00:00Z",
+      "required_attendees": [
+        "p001"
+      ],
+      "optional_attendees": [],
+      "skills": {},
+      "roles": {},
+      "priority": 2
+    },
+    {
+      "id": "pod0-anchor",
+      "duration_minutes": 30,
+      "earliest": "2027-01-04T11:00:00Z",
+      "latest": "2027-01-04T11:30:00Z",
+      "required_attendees": [
+        "p002"
+      ],
+      "optional_attendees": [],
+      "skills": {},
+      "roles": {},
+      "priority": 1
+    },
+    {
+      "id": "pod0-flex",
+      "duration_minutes": 30,
+      "earliest": "2027-01-04T09:00:00Z",
+      "latest": "2027-01-04T11:00:00Z",
+      "required_attendees": [
+        "p002"
+      ],
+      "optional_attendees": [],
+      "skills": {},
+      "roles": {},
+      "priority": 1
+    },
+    {
+      "id": "pod0-build0",
+      "duration_minutes": 30,
+      "earliest": "2027-01-04T09:00:00Z",
+      "latest": "2027-01-04T12:00:00Z",
+      "required_attendees": [],
+      "optional_attendees": [],
+      "skills": {
+        "build-0": 1
+      },
+      "roles": {
+        "reviewer": 1
+      },
+      "priority": 3
+    },
+    {
+      "id": "pod0-build1",
+      "duration_minutes": 30,
+      "earliest": "2027-01-04T09:00:00Z",
+      "latest": "2027-01-04T12:00:00Z",
+      "required_attendees": [],
+      "optional_attendees": [],
+      "skills": {
+        "build-0": 1
+      },
+      "roles": {
+        "reviewer": 1
+      },
+      "priority": 2
+    },
+    {
+      "id": "pod0-build2",
+      "duration_minutes": 30,
+      "earliest": "2027-01-04T09:00:00Z",
+      "latest": "2027-01-04T12:00:00Z",
+      "required_attendees": [],
+      "optional_attendees": [],
+      "skills": {
+        "build-0": 1
+      },
+      "roles": {
+        "reviewer": 1
+      },
+      "priority": 4
+    },
+    {
+      "id": "pod0-build3",
+      "duration_minutes": 30,
+      "earliest": "2027-01-04T09:00:00Z",
+      "latest": "2027-01-04T12:00:00Z",
+      "required_attendees": [],
+      "optional_attendees": [],
+      "skills": {
+        "build-0": 1
+      },
+      "roles": {
+        "reviewer": 1
+      },
+      "priority": 1
+    }
+  ],
+  "grid_minutes": 15,
+  "max_load_difference_minutes": null
+}
