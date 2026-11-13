@@ -30,11 +30,11 @@ Local-only milestone. All workloads and measurements are synthetic. No remote op
 
 ### 04. Interoperable solved schedule export
 
-- Status: planned.
+- Status: complete.
 - Problem: Solved assignments cannot be imported into a calendar client.
 - Acceptance: Export UTC VEVENTs with deterministic UID, escaped summaries and attendee IDs through Python, CLI and HTTP; validate assignments against workload before exporting.
 - Test plan: Round-trip with icalendar and busy importer; special characters, stable IDs, empty schedules, invalid results and CLI/HTTP contracts.
-- Delivery commits: pending.
+- Delivery commits: `af7ebcf` (implementation and tests).
 
 ### 05. Larger reproducible benchmark curves
 

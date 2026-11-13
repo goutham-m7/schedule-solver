@@ -111,8 +111,8 @@ class Request(StrictModel):
 
 
 class Workload(Period):
-    people: list[Person] = Field(min_length=1, max_length=100)
-    requests: list[Request] = Field(max_length=500)
+    people: list[Person] = Field(min_length=1, max_length=500)
+    requests: list[Request] = Field(max_length=1200)
     grid_minutes: int = Field(default=15, ge=1, le=60)
     max_load_difference_minutes: int | None = Field(default=None, ge=0, le=100000)
 

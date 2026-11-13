@@ -9,6 +9,7 @@ from pathlib import Path
 import httpx
 from pydantic import ValidationError
 
+from .benchmarks import curves, environment
 from .calendars import export_ics, import_ics
 from .explain import explain_result
 from .greedy import greedy
@@ -55,6 +56,15 @@ def parser():
                 "--provider", choices=["mock", "openai"], default="mock"
             )
             command.add_argument("--model", default="gpt-4o-mini")
+        else:
+            command.add_argument("--sizes", type=int, nargs="+", default=[20, 50, 100])
+            command.add_argument("--budgets", type=float, nargs="+")
+            command.add_argument(
+                "--families",
+                nargs="+",
+                choices=["independent", "ring"],
+                default=["independent"],
+            )
         command.add_argument("--seed", type=int, default=7)
         command.add_argument("--time-limit", type=float, default=10)
         command.add_argument("--output", type=Path, default=Path("artifacts"))
@@ -99,62 +109,59 @@ def main():
             if args.ics:
                 args.ics.write_text(export_ics(work, result))
             print(result.model_dump_json(indent=2))
-        else:
-            sizes = [args.people] if args.command == "demo" else [20, 50, 100]
-            rows, records = [], []
+        elif args.command == "benchmark":
             args.output.mkdir(parents=True, exist_ok=True)
-            for size in sizes:
-                work = generate(size, args.seed)
-                baseline, result = greedy(work), solve(work, args.time_limit)
-                rows.extend([(work, baseline), (work, result)])
-                records.append(
-                    {
-                        "people": size,
-                        "seed": args.seed,
-                        "workload": work.model_dump(mode="json"),
-                        "greedy": baseline.model_dump(mode="json"),
-                        "optimized": result.model_dump(mode="json"),
-                    }
+            records, tables = [], []
+            for work, baseline, result, record in curves(
+                args.sizes, args.budgets or [args.time_limit], args.families, args.seed
+            ):
+                records.append(record)
+                tables.append(
+                    f"### {record['family']}, {record['people']} people, budget {record['time_limit']:g}s\n\n"
+                    + comparison_table([(work, baseline), (work, result)])
                 )
-            print(comparison_table(rows))
-            if args.command == "demo":
-                result = explain_result(work, result)
-                args.output.joinpath("workload.json").write_text(
-                    work.model_dump_json(indent=2) + "\n"
-                )
-                args.output.joinpath("result.json").write_text(
-                    result.model_dump_json(indent=2) + "\n"
-                )
-                args.output.joinpath("calendar.html").write_text(
-                    calendar_html(work, result)
-                )
-                args.output.joinpath("schedule.ics").write_text(
-                    export_ics(work, result)
-                )
-                print("\nExplanations (fixed-schedule insertion certificates):")
-                with httpx.Client() as client:
-                    narrator = (
-                        MockNarrator()
-                        if args.provider == "mock"
-                        else OpenAINarrator(
-                            os.environ.get(
-                                "SCHEDULE_LLM_BASE_URL", "https://api.openai.com/v1"
-                            ),
-                            os.environ.get("SCHEDULE_LLM_API_KEY", ""),
-                            args.model,
-                            client,
-                        )
+            report = "\n\n".join(tables) + "\n"
+            print(report)
+            args.output.joinpath("benchmark.json").write_text(
+                json.dumps(records, indent=2) + "\n"
+            )
+            args.output.joinpath("benchmark.md").write_text(report)
+            args.output.joinpath("environment.json").write_text(
+                json.dumps(environment(), indent=2) + "\n"
+            )
+        else:
+            work = generate(args.people, args.seed)
+            baseline, result = greedy(work), solve(work, args.time_limit)
+            print(comparison_table([(work, baseline), (work, result)]))
+            args.output.mkdir(parents=True, exist_ok=True)
+            result = explain_result(work, result)
+            args.output.joinpath("workload.json").write_text(
+                work.model_dump_json(indent=2) + "\n"
+            )
+            args.output.joinpath("result.json").write_text(
+                result.model_dump_json(indent=2) + "\n"
+            )
+            args.output.joinpath("calendar.html").write_text(
+                calendar_html(work, result)
+            )
+            args.output.joinpath("schedule.ics").write_text(export_ics(work, result))
+            print("\nExplanations (fixed-schedule insertion certificates):")
+            with httpx.Client() as client:
+                narrator = (
+                    MockNarrator()
+                    if args.provider == "mock"
+                    else OpenAINarrator(
+                        os.environ.get(
+                            "SCHEDULE_LLM_BASE_URL", "https://api.openai.com/v1"
+                        ),
+                        os.environ.get("SCHEDULE_LLM_API_KEY", ""),
+                        args.model,
+                        client,
                     )
-                    for explanation in result.explanations[:12]:
-                        print(narrator.describe(explanation))
-                print(f"\nCalendar: {args.output / 'calendar.html'}")
-            else:
-                args.output.joinpath("benchmark.json").write_text(
-                    json.dumps(records, indent=2) + "\n"
                 )
-                args.output.joinpath("benchmark.md").write_text(
-                    comparison_table(rows) + "\n"
-                )
+                for explanation in result.explanations[:12]:
+                    print(narrator.describe(explanation))
+            print(f"\nCalendar: {args.output / 'calendar.html'}")
     except (
         OSError,
         ValueError,

@@ -10,9 +10,13 @@ from random import Random
 from .models import Period, Person, Request, WorkingHours, Workload
 
 
-def generate(people: int = 20, seed: int = 7) -> Workload:
-    if people not in range(5, 101, 5):
-        raise ValueError("people must be a multiple of 5 between 5 and 100")
+def generate(
+    people: int = 20, seed: int = 7, *, family: str = "independent"
+) -> Workload:
+    if people not in range(5, 501, 5):
+        raise ValueError("people must be a multiple of 5 between 5 and 500")
+    if family not in ("independent", "ring"):
+        raise ValueError("family must be independent or ring")
     rng = Random(seed)
     origin = datetime(2027, 1, 4, 9, tzinfo=UTC)
 
@@ -46,6 +50,8 @@ def generate(people: int = 20, seed: int = 7) -> Workload:
                     max_meetings_per_day=6,
                 )
             )
+            if family == "ring" and i >= 3:
+                persons[-1].skills.add(f"build-{(pod - 1) % (people // 5)}")
 
         def add(name, duration, earliest, latest, required, priority=1, pod=pod, **kw):
             requests.append(
