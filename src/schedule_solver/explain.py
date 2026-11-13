@@ -20,9 +20,7 @@ class InsertionModel:
     def __init__(self, work: Workload, result: Result, request: Request):
         self.model = model = cp_model.CpModel()
         self.labels = {}
-        self.request = request
-        self.work = work
-        self.start = start = model.new_int_var(
+        start = model.new_int_var(
             0, max(0, len(slots(work, request)) - 1), "insertion_start"
         )
         self.people = {p.id: model.new_bool_var(f"insert:{p.id}") for p in work.people}
@@ -131,7 +129,7 @@ class InsertionModel:
                         <= work.max_load_difference_minutes
                     ).only_enforce_if(label("fairness"))
 
-    def check(self, enabled: set[str] | None = None, slot: int | None = None):
+    def check(self, enabled: set[str] | None = None):
         if enabled is None:
             enabled = set(self.labels)
         self.model.clear_assumptions()
@@ -141,9 +139,6 @@ class InsertionModel:
         engine = cp_model.CpSolver()
         engine.parameters.max_time_in_seconds = 5
         engine.parameters.num_search_workers = 1
-        if slot is not None:
-            # Used only on a fresh model by the greedy baseline.
-            self.model.add(self.start == slot)
         status = engine.solve(self.model)
         if status not in (cp_model.OPTIMAL, cp_model.FEASIBLE, cp_model.INFEASIBLE):
             raise RuntimeError(
@@ -241,6 +236,15 @@ def explain_result(work: Workload, result: Result) -> Result:
             )
         else:
             conflict = InsertionModel(work, result, request).minimal_conflict()
+            context = [
+                f"Required attendees={request.required_attendees}; skills={request.skills}; roles={request.roles}.",
+                "Eligibility restricts attendees to named people or holders of a requested skill/role.",
+            ]
+            for meeting in result.meetings:
+                if f"meeting:{meeting.request_id}" in (conflict or []):
+                    context.append(
+                        f"Frozen meeting {meeting.request_id}: {meeting.start.isoformat()} to {meeting.end.isoformat()}, attendees={meeting.attendees}, with each attendee's buffers."
+                    )
             explanations.append(
                 Explanation(
                     request_id=request.id,
@@ -249,7 +253,8 @@ def explain_result(work: Workload, result: Result) -> Result:
                         "Insertion is feasible: omission reflects an objective trade-off or search time limit."
                         if conflict is None
                         else "Deletion-minimal conflict with the returned schedule held fixed; not minimum-cardinality and not a claim about rearranging meetings."
-                    ],
+                    ]
+                    + context,
                     conflict=conflict or [],
                     minimal=conflict is not None,
                 )

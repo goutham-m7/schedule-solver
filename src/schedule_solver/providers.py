@@ -7,7 +7,7 @@ from .models import Explanation
 
 class MockNarrator:
     def describe(self, explanation: Explanation) -> str:
-        details = "; ".join(explanation.facts)
+        details = " ".join(explanation.facts)
         conflict = ", ".join(explanation.conflict)
         return f"{explanation.request_id} [{explanation.kind}]: {details}" + (
             f" Conflict: {conflict}." if conflict else ""
