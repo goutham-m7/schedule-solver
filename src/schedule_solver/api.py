@@ -1,9 +1,10 @@
 """Local, stateless FastAPI surface. Do not expose without auth and admission control."""
 
 from fastapi import FastAPI, HTTPException
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, Response
 from pydantic import Field
 
+from .calendars import export_ics
 from .explain import explain_result
 from .greedy import greedy
 from .models import Meeting, StrictModel, Workload
@@ -65,3 +66,12 @@ def resolve_endpoint(input: ResolveInput):
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     except RuntimeError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+
+@app.post(
+    "/export-ics",
+    response_class=Response,
+    responses={200: {"content": {"text/calendar": {}}}},
+)
+def export_endpoint(input: SolveInput):
+    return Response(export_ics(input.workload, run(input)), media_type="text/calendar")

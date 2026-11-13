@@ -9,7 +9,7 @@ from pathlib import Path
 import httpx
 from pydantic import ValidationError
 
-from .calendars import import_ics
+from .calendars import export_ics, import_ics
 from .explain import explain_result
 from .greedy import greedy
 from .models import Workload
@@ -42,6 +42,9 @@ def parser():
     command = commands.add_parser("solve", help="Solve canonical JSON input")
     command.add_argument("input", type=Path)
     command.add_argument("--html", type=Path)
+    command.add_argument(
+        "--ics", type=Path, help="Export checked assignments as iCalendar"
+    )
     command.add_argument("--time-limit", type=float, default=10)
     command.add_argument("--no-explanations", action="store_true")
     for name in ("demo", "benchmark"):
@@ -93,6 +96,8 @@ def main():
                 result = explain_result(work, result)
             if args.html:
                 args.html.write_text(calendar_html(work, result))
+            if args.ics:
+                args.ics.write_text(export_ics(work, result))
             print(result.model_dump_json(indent=2))
         else:
             sizes = [args.people] if args.command == "demo" else [20, 50, 100]
@@ -122,6 +127,9 @@ def main():
                 )
                 args.output.joinpath("calendar.html").write_text(
                     calendar_html(work, result)
+                )
+                args.output.joinpath("schedule.ics").write_text(
+                    export_ics(work, result)
                 )
                 print("\nExplanations (fixed-schedule insertion certificates):")
                 with httpx.Client() as client:

@@ -1,11 +1,13 @@
 """UTC grid and strict ICS busy-calendar import. All intervals are half-open."""
 
-from datetime import datetime, timedelta
+import json
+from datetime import UTC, datetime, timedelta
+from uuid import NAMESPACE_URL, uuid5
 from zoneinfo import ZoneInfo
 
-from icalendar import Calendar
+from icalendar import Calendar, Event
 
-from .models import Period, Person, Request, Workload
+from .models import Period, Person, Request, Result, Workload
 from .recurrence import event_periods
 
 
@@ -131,7 +133,9 @@ def import_ics(
     periods = []
     for event in calendar.walk("VEVENT"):
         if event.errors:
-            raise ValueError(f"invalid ICS recurrence or event property: {event.errors}")
+            raise ValueError(
+                f"invalid ICS recurrence or event property: {event.errors}"
+            )
         if any(key in event for key in ("RECURRENCE-ID", "EXRULE")):
             raise ValueError("unsupported recurrence override or EXRULE")
         if (
@@ -141,3 +145,30 @@ def import_ics(
             continue
         periods.extend(event_periods(event, zone, horizon, max_occurrences))
     return merge_periods(periods)
+
+
+def export_ics(work: Workload, result: Result) -> str:
+    """Serialize checked assignments; attendee IDs are not invented email addresses."""
+    from .validation import validate_schedule
+
+    validate_schedule(work, result)
+    calendar = Calendar()
+    calendar.add("prodid", "-//schedule-solver//EN")
+    calendar.add("version", "2.0")
+    stamp = datetime.now(UTC)
+    for meeting in sorted(result.meetings, key=lambda m: (m.start, m.request_id)):
+        event = Event()
+        event.add(
+            "uid",
+            f"{uuid5(NAMESPACE_URL, 'schedule-solver:' + meeting.request_id)}@schedule-solver",
+        )
+        event.add("dtstamp", stamp)
+        event.add("dtstart", meeting.start.astimezone(UTC))
+        event.add("dtend", meeting.end.astimezone(UTC))
+        event.add("summary", meeting.request_id)
+        event.add(
+            "x-schedule-attendees",
+            json.dumps(sorted(meeting.attendees), ensure_ascii=False),
+        )
+        calendar.add_component(event)
+    return calendar.to_ical().decode("utf-8")
