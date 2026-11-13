@@ -9,7 +9,9 @@ from .models import Result, Workload
 
 
 def calendar_html(work: Workload, result: Result) -> str:
-    e = lambda value: escape(str(value), quote=True)
+    def e(value):
+        return escape(str(value), quote=True)
+
     days = defaultdict(list)
     people = {p.id: p for p in work.people}
     for meeting in result.meetings:

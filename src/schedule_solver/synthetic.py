@@ -15,7 +15,10 @@ def generate(people: int = 20, seed: int = 7) -> Workload:
         raise ValueError("people must be a multiple of 5 between 5 and 100")
     rng = Random(seed)
     origin = datetime(2027, 1, 4, 9, tzinfo=UTC)
-    at = lambda minutes: origin + timedelta(minutes=minutes)
+
+    def at(minutes):
+        return origin + timedelta(minutes=minutes)
+
     persons, requests = [], []
     for pod in range(people // 5):
         ids = [f"p{pod * 5 + i:03d}" for i in range(5)]

@@ -89,7 +89,7 @@ def test_priority_matches_exhaustive_subset_oracle(payload):
     ]
     feasible_scores = []
     for bits in itertools.product([0, 1], repeat=len(specs)):
-        chosen = [s for s, bit in zip(specs, bits) if bit]
+        chosen = [s for s, bit in zip(specs, bits, strict=True) if bit]
         if all(
             a[1] <= b[0] or b[1] <= a[0] for a, b in itertools.combinations(chosen, 2)
         ):

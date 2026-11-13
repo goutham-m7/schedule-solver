@@ -133,6 +133,8 @@ def solve(work: Workload, time_limit: float = 10.0):
             + work.minutes * (1 - active)
             - sum(r.duration_minutes * a for r, _, a in entries)
         )
+        # Implied by NoOverlap, but the explicit cut improves the relaxation.
+        model.add(gaps[-1] >= 0)
         active_days.append(active)
     max_minutes = sum(r.duration_minutes for r in work.requests)
     loads = []
@@ -185,6 +187,8 @@ def solve(work: Workload, time_limit: float = 10.0):
             model.minimize(objective)
         engine = cp_model.CpSolver()
         engine.parameters.max_time_in_seconds = time_limit / len(objectives)
+        # Work-based stopping is reproducible; wall time remains a safety ceiling.
+        engine.parameters.max_deterministic_time = time_limit / (20 * len(objectives))
         engine.parameters.num_search_workers = 1
         engine.parameters.random_seed = 0
         status = engine.solve(model)

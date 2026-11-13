@@ -1,14 +1,8 @@
 """Optional commentary only: an LLM cannot alter optimization or certificates."""
 
-from typing import Protocol
-
 import httpx
 
 from .models import Explanation
-
-
-class Narrator(Protocol):
-    def describe(self, explanation: Explanation) -> str: ...
 
 
 class MockNarrator:
