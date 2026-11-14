@@ -2,6 +2,27 @@
 
 Offline CP-SAT meeting scheduling with calendar constraints and checked conflict explanations.
 
+## The problem
+
+Meeting organizers need to know which constraints prevent a request from fitting,
+not just see an empty booking page: free calendar time alone does not establish
+bookability.
+
+- [Google Calendar's availability documentation](https://support.google.com/calendar/answer/11423292?hl=en)
+  warns that its default **4-hour minimum notice** can hide all same-day availability,
+  and documents buffers and daily booking caps (undated; accessed 2026-11-14).
+- [Calendly's troubleshooting guide](https://calendly.com/help/how-to-troubleshoot-unavailable-times-that-should-be-available)
+  lists distinct blockers including duration, buffers, host availability and unfair
+  distribution; organizers must open its diagnostic tool to inspect the reasons
+  (updated 2026-10-26).
+
+These products do provide diagnostics; the problem is understanding interacting
+constraints, not a claim that no scheduler explains failures.
+
+schedule-solver schedules an offline workload and checks conflict certificates for
+excluded requests against the fixed resulting schedule; those certificates do not
+prove that rearranging every meeting could never fit the request.
+
 **v0.2.0:** recurring busy calendars, stable re-solving, small minimum-cardinality
 conflicts, checked ICS export, and benchmark curves through 500 people.
 
